@@ -1,0 +1,992 @@
+{
+  "version": 1,
+  "title": "AI & AI Research",
+  "rootId": "node_root",
+  "nodes": {
+    "node_root": {
+      "id": "node_root",
+      "text": "AI & AI Research",
+      "note": "Major paradigms, model families, learning settings, modalities, and open research areas.",
+      "parentId": null,
+      "childIds": [
+        "paradigms",
+        "model_families",
+        "learning",
+        "modalities",
+        "research",
+        "applications"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "paradigms": {
+      "id": "paradigms",
+      "text": "Core Paradigms",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "symbolic",
+        "stat_ml",
+        "deep_learning",
+        "rl_paradigm",
+        "hybrid"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "blue"
+    },
+    "model_families": {
+      "id": "model_families",
+      "text": "Model Families",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "transformers",
+        "diffusion",
+        "cnns",
+        "rnns",
+        "gans",
+        "vaes",
+        "gnns",
+        "moe",
+        "world_models"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "purple"
+    },
+    "learning": {
+      "id": "learning",
+      "text": "Learning Settings",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "supervised",
+        "unsupervised",
+        "self_supervised",
+        "semi_supervised",
+        "reinforcement",
+        "transfer",
+        "continual"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "green"
+    },
+    "modalities": {
+      "id": "modalities",
+      "text": "Modalities & Tasks",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "nlp",
+        "vision",
+        "speech",
+        "multimodal",
+        "robotics",
+        "science"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "orange"
+    },
+    "research": {
+      "id": "research",
+      "text": "Research Fronts",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "alignment",
+        "interp",
+        "evaluation",
+        "efficiency",
+        "data",
+        "reasoning",
+        "privacy",
+        "causal"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "red"
+    },
+    "applications": {
+      "id": "applications",
+      "text": "Applications",
+      "note": "",
+      "parentId": "node_root",
+      "childIds": [
+        "assistants",
+        "creative",
+        "health",
+        "autonomy",
+        "enterprise",
+        "science_app"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "yellow"
+    },
+    "symbolic": {
+      "id": "symbolic",
+      "text": "Symbolic / GOFAI",
+      "note": "Rules, logic, planning, expert systems, knowledge representation.",
+      "parentId": "paradigms",
+      "childIds": [
+        "planning",
+        "knowledge"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "stat_ml": {
+      "id": "stat_ml",
+      "text": "Statistical Machine Learning",
+      "note": "Probabilistic models, kernels, graphical models, Bayesian methods.",
+      "parentId": "paradigms",
+      "childIds": [
+        "bayesian",
+        "prob_graph"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "deep_learning": {
+      "id": "deep_learning",
+      "text": "Deep Learning",
+      "note": "Neural networks trained on large datasets with gradient descent.",
+      "parentId": "paradigms",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "rl_paradigm": {
+      "id": "rl_paradigm",
+      "text": "Reinforcement Learning",
+      "note": "Sequential decision making via reward signals.",
+      "parentId": "paradigms",
+      "childIds": [
+        "policy",
+        "model_based_rl"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "hybrid": {
+      "id": "hybrid",
+      "text": "Hybrid Neuro-Symbolic AI",
+      "note": "Combines neural perception with symbolic structure or reasoning.",
+      "parentId": "paradigms",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "transformers": {
+      "id": "transformers",
+      "text": "Transformers",
+      "note": "Attention-based sequence and multimodal models; foundation of modern LLMs.",
+      "parentId": "model_families",
+      "childIds": [
+        "llms",
+        "vision_transformers",
+        "multimodal_transformers"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "diffusion": {
+      "id": "diffusion",
+      "text": "Diffusion Models",
+      "note": "Generative models that denoise noise into images, audio, video, or 3D.",
+      "parentId": "model_families",
+      "childIds": [
+        "image_gen",
+        "video_gen",
+        "control_diff"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "cnns": {
+      "id": "cnns",
+      "text": "CNNs",
+      "note": "Convolutional architectures for vision and spatial data.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "rnns": {
+      "id": "rnns",
+      "text": "RNNs / LSTMs",
+      "note": "Older sequential models for language, speech, and time series.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "gans": {
+      "id": "gans",
+      "text": "GANs",
+      "note": "Generator-discriminator framework for realistic synthesis.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "vaes": {
+      "id": "vaes",
+      "text": "VAEs",
+      "note": "Latent-variable generative models with probabilistic encoders.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "gnns": {
+      "id": "gnns",
+      "text": "Graph Neural Networks",
+      "note": "Reasoning over graph-structured data such as molecules and networks.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "moe": {
+      "id": "moe",
+      "text": "Mixture-of-Experts",
+      "note": "Sparse architectures that route tokens to specialized experts.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "world_models": {
+      "id": "world_models",
+      "text": "World Models",
+      "note": "Latent dynamics models for planning, simulation, and embodied agents.",
+      "parentId": "model_families",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "supervised": {
+      "id": "supervised",
+      "text": "Supervised Learning",
+      "note": "",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "unsupervised": {
+      "id": "unsupervised",
+      "text": "Unsupervised Learning",
+      "note": "",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "self_supervised": {
+      "id": "self_supervised",
+      "text": "Self-Supervised Learning",
+      "note": "Predict masked, future, or contrastive targets from raw data.",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "semi_supervised": {
+      "id": "semi_supervised",
+      "text": "Semi-Supervised Learning",
+      "note": "",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "reinforcement": {
+      "id": "reinforcement",
+      "text": "Reinforcement Learning",
+      "note": "",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "transfer": {
+      "id": "transfer",
+      "text": "Transfer / Meta-Learning",
+      "note": "Generalize quickly across tasks, domains, or limited examples.",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "continual": {
+      "id": "continual",
+      "text": "Continual / Lifelong Learning",
+      "note": "Adapt over time while avoiding catastrophic forgetting.",
+      "parentId": "learning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "nlp": {
+      "id": "nlp",
+      "text": "Language / NLP",
+      "note": "",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "vision": {
+      "id": "vision",
+      "text": "Computer Vision",
+      "note": "",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "speech": {
+      "id": "speech",
+      "text": "Speech & Audio",
+      "note": "",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "multimodal": {
+      "id": "multimodal",
+      "text": "Multimodal AI",
+      "note": "Joint models across text, image, audio, video, and action.",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "robotics": {
+      "id": "robotics",
+      "text": "Robotics & Control",
+      "note": "",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "science": {
+      "id": "science",
+      "text": "Code, Science, and Time Series",
+      "note": "",
+      "parentId": "modalities",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "alignment": {
+      "id": "alignment",
+      "text": "Alignment & Safety",
+      "note": "Making advanced systems behave as intended under real-world conditions.",
+      "parentId": "research",
+      "childIds": [
+        "red_team"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "interp": {
+      "id": "interp",
+      "text": "Interpretability",
+      "note": "Understanding features, circuits, representations, and failures.",
+      "parentId": "research",
+      "childIds": [
+        "mechanistic"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "evaluation": {
+      "id": "evaluation",
+      "text": "Evaluation & Benchmarks",
+      "note": "Measure capability, robustness, calibration, and generalization.",
+      "parentId": "research",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "efficiency": {
+      "id": "efficiency",
+      "text": "Efficiency & Scaling",
+      "note": "Inference speed, training cost, sparse compute, quantization, distillation.",
+      "parentId": "research",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "data": {
+      "id": "data",
+      "text": "Data Curation & Synthetic Data",
+      "note": "",
+      "parentId": "research",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "reasoning": {
+      "id": "reasoning",
+      "text": "Reasoning, Agents, and Tool Use",
+      "note": "",
+      "parentId": "research",
+      "childIds": [
+        "rag",
+        "agents"
+      ],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "privacy": {
+      "id": "privacy",
+      "text": "Fairness, Privacy, and Security",
+      "note": "",
+      "parentId": "research",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "causal": {
+      "id": "causal",
+      "text": "Causality & Scientific Discovery",
+      "note": "",
+      "parentId": "research",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "assistants": {
+      "id": "assistants",
+      "text": "Assistants & Search",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "creative": {
+      "id": "creative",
+      "text": "Creative Generation",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "health": {
+      "id": "health",
+      "text": "Healthcare & Biology",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "autonomy": {
+      "id": "autonomy",
+      "text": "Autonomy & Robotics",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "enterprise": {
+      "id": "enterprise",
+      "text": "Enterprise Automation",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "science_app": {
+      "id": "science_app",
+      "text": "Science & Engineering",
+      "note": "",
+      "parentId": "applications",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "llms": {
+      "id": "llms",
+      "text": "LLMs and instruction tuning",
+      "note": "",
+      "parentId": "transformers",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "vision_transformers": {
+      "id": "vision_transformers",
+      "text": "Vision transformers",
+      "note": "",
+      "parentId": "transformers",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "multimodal_transformers": {
+      "id": "multimodal_transformers",
+      "text": "Vision-language and audio-language models",
+      "note": "",
+      "parentId": "transformers",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "image_gen": {
+      "id": "image_gen",
+      "text": "Image generation",
+      "note": "",
+      "parentId": "diffusion",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "video_gen": {
+      "id": "video_gen",
+      "text": "Video generation",
+      "note": "",
+      "parentId": "diffusion",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "control_diff": {
+      "id": "control_diff",
+      "text": "Controllable generation and editing",
+      "note": "",
+      "parentId": "diffusion",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "planning": {
+      "id": "planning",
+      "text": "Planning and search",
+      "note": "",
+      "parentId": "symbolic",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "knowledge": {
+      "id": "knowledge",
+      "text": "Knowledge graphs and ontologies",
+      "note": "",
+      "parentId": "symbolic",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "bayesian": {
+      "id": "bayesian",
+      "text": "Bayesian inference",
+      "note": "",
+      "parentId": "stat_ml",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "prob_graph": {
+      "id": "prob_graph",
+      "text": "Probabilistic graphical models",
+      "note": "",
+      "parentId": "stat_ml",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "policy": {
+      "id": "policy",
+      "text": "Policy optimization",
+      "note": "",
+      "parentId": "rl_paradigm",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "model_based_rl": {
+      "id": "model_based_rl",
+      "text": "Model-based RL",
+      "note": "",
+      "parentId": "rl_paradigm",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "rag": {
+      "id": "rag",
+      "text": "Retrieval-augmented generation",
+      "note": "",
+      "parentId": "reasoning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "agents": {
+      "id": "agents",
+      "text": "Planning agents with tools",
+      "note": "",
+      "parentId": "reasoning",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "mechanistic": {
+      "id": "mechanistic",
+      "text": "Mechanistic interpretability",
+      "note": "",
+      "parentId": "interp",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    },
+    "red_team": {
+      "id": "red_team",
+      "text": "Adversarial testing and red teaming",
+      "note": "",
+      "parentId": "alignment",
+      "childIds": [],
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "tags": [],
+      "status": "none",
+      "color": "default"
+    }
+  },
+  "metadata": {
+    "createdAt": "2026-03-17T16:33:39.177Z",
+    "updatedAt": "2026-03-17T16:33:39.177Z",
+    "canvas": {
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 0.9
+      }
+    }
+  }
+}

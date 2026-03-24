@@ -1,0 +1,64 @@
+{
+  "id": "com.developer.nimbalyst-mindmap",
+  "name": "Nimbalyst Mindmap",
+  "version": "1.0.0",
+  "description": "A freeform spatial mindmap editor with AI-assisted editing",
+  "main": "dist/index.js",
+  "styles": "dist/index.css",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "filesystem": true
+  },
+  "marketplace": {
+    "categories": ["diagrams"],
+    "tags": ["mindmap", "brainstorming", "spatial", "canvas", "hierarchy", "knowledge-map"],
+    "icon": "account_tree",
+    "featured": false,
+    "tagline": "Freeform spatial mindmap editor with AI-assisted editing",
+    "longDescription": "Create hierarchical mind maps on an infinite canvas. Add nodes, color-code branches, attach notes and tags, and use the AI to generate entire mind maps from a topic.",
+    "highlights": [
+      "Infinite canvas with keyboard-driven node creation",
+      "Color-coded branches, notes, tags, and status per node",
+      "AI generates complete mind maps from a topic description"
+    ],
+    "fileTypes": [".mindmap"],
+    "screenshots": [
+      {
+        "alt": "Mindmap editor showing hierarchical knowledge map with color-coded branches",
+        "fileToOpen": "samples/demo.mindmap"
+      }
+    ]
+  },
+  "contributions": {
+    "customEditors": [
+      {
+        "filePatterns": [
+          "*.mindmap"
+        ],
+        "displayName": "Nimbalyst Mindmap",
+        "component": "MindmapEditor",
+        "supportsSourceMode": true
+      }
+    ],
+    "newFileMenu": [
+      {
+        "extension": ".mindmap",
+        "displayName": "Mindmap",
+        "icon": "account_tree",
+        "defaultContent": "---\ntitle: Untitled map\n---\n\n# Central idea\n"
+      }
+    ],
+    "fileIcons": {
+      "*.mindmap": "account_tree"
+    },
+    "claudePlugin": {
+      "path": "claude-plugin",
+      "displayName": "Nimbalyst Mindmap",
+      "description": "Teaches Claude how to read and write .mindmap files",
+      "enabledByDefault": true,
+      "commands": [
+        { "name": "mindmap", "description": "Create a new mindmap from a topic or description" }
+      ]
+    }
+  }
+}

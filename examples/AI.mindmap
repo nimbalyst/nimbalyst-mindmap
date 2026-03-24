@@ -1,0 +1,43 @@
+---
+title: AI & AI Research
+---
+
+# AI & AI Research
+> Major paradigms, model families, and open research areas.
+
+## Core Paradigms {color: blue}
+
+### Symbolic / GOFAI
+> Rules, logic, planning, expert systems.
+- Planning and search
+- Knowledge graphs and ontologies
+### Statistical Machine Learning
+> Probabilistic models, kernels, graphical models.
+- Bayesian inference
+- Probabilistic graphical models
+### Deep Learning
+### Reinforcement Learning {status: in-progress}
+- Policy optimization
+- Model-based RL
+
+## Model Families {color: purple}
+
+### Transformers {tags: attention, nlp}
+> Foundation of modern LLMs.
+- LLMs and instruction tuning
+- Vision transformers
+### Diffusion Models
+> Denoise into images, audio, video.
+- Image generation {status: done}
+- Video generation {status: todo}
+### CNNs
+### GANs
+### Graph Neural Networks
+
+## Research Fronts {color: red}
+
+### Alignment & Safety
+> Making advanced systems behave as intended.
+- Adversarial testing {tags: safety, priority}
+### Interpretability {status: in-progress}
+- Mechanistic interpretability

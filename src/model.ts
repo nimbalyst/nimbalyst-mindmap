@@ -1,0 +1,654 @@
+// Graph model: parsing, serialization, mutations, layout
+
+import type { MindmapDocument, MindmapNode, NodeStatus, NodeColor, EditorState, EditorAction } from './types';
+
+// --- ID generation ---
+
+let idCounter = 0;
+export function generateNodeId(): string {
+  return `node_${Date.now()}_${idCounter++}`;
+}
+
+// --- Empty document ---
+
+export function createEmptyDocument(): MindmapDocument {
+  const rootId = 'node_root';
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    title: 'Untitled map',
+    rootId,
+    nodes: {
+      [rootId]: {
+        id: rootId,
+        text: 'Central idea',
+        note: '',
+        parentId: null,
+        childIds: [],
+        position: { x: 0, y: 0 },
+        tags: [],
+        status: 'none',
+        color: 'default',
+      },
+    },
+    metadata: {
+      createdAt: now,
+      updatedAt: now,
+      canvas: { viewport: { x: 0, y: 0, zoom: 1 } },
+    },
+  };
+}
+
+// --- Metadata parsing helpers ---
+
+const VALID_STATUSES: NodeStatus[] = ['idea', 'question', 'todo', 'in-progress', 'done'];
+const VALID_COLORS: NodeColor[] = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
+
+interface ParsedMeta {
+  text: string;
+  color: NodeColor;
+  status: NodeStatus;
+  tags: string[];
+}
+
+/** Parse trailing {key: value, ...} metadata from a line, returning cleaned text + metadata */
+export function parseInlineMetadata(raw: string): ParsedMeta {
+  const result: ParsedMeta = { text: raw, color: 'default', status: 'none', tags: [] };
+  const metaMatch = raw.match(/\{([^}]+)\}\s*$/);
+  if (!metaMatch) return result;
+
+  result.text = raw.slice(0, metaMatch.index).trim();
+  const metaStr = metaMatch[1];
+
+  // Split on "key:" boundaries to handle commas inside tag values
+  // e.g. "color: blue, status: todo, tags: frontend, urgent"
+  // -> ["color: blue", "status: todo", "tags: frontend, urgent"]
+  const keyValuePairs: { key: string; val: string }[] = [];
+  const keyPattern = /\b(color|status|tags)\s*:/g;
+  let match: RegExpExecArray | null;
+  const starts: { key: string; start: number }[] = [];
+  while ((match = keyPattern.exec(metaStr)) !== null) {
+    starts.push({ key: match[1], start: match.index + match[0].length });
+  }
+  for (let i = 0; i < starts.length; i++) {
+    const end = i + 1 < starts.length
+      ? metaStr.lastIndexOf(',', starts[i + 1].start)
+      : metaStr.length;
+    keyValuePairs.push({
+      key: starts[i].key,
+      val: metaStr.slice(starts[i].start, end).trim(),
+    });
+  }
+
+  for (const { key, val } of keyValuePairs) {
+    switch (key) {
+      case 'color':
+        if (VALID_COLORS.includes(val as NodeColor)) result.color = val as NodeColor;
+        break;
+      case 'status':
+        if (VALID_STATUSES.includes(val as NodeStatus)) result.status = val as NodeStatus;
+        break;
+      case 'tags':
+        result.tags = val.split(',').map((t) => t.trim()).filter(Boolean);
+        break;
+    }
+  }
+  return result;
+}
+
+/** Format metadata as inline {key: value} string, or empty string if no metadata */
+function formatInlineMetadata(node: MindmapNode): string {
+  const parts: string[] = [];
+  if (node.color !== 'default') parts.push(`color: ${node.color}`);
+  if (node.status !== 'none') parts.push(`status: ${node.status}`);
+  if (node.tags.length > 0) parts.push(`tags: ${node.tags.join(', ')}`);
+  return parts.length > 0 ? ` {${parts.join(', ')}}` : '';
+}
+
+// --- Markdown Parser ---
+
+export function parseDocument(raw: string): MindmapDocument {
+  if (!raw || !raw.trim()) {
+    return createEmptyDocument();
+  }
+
+  const lines = raw.split('\n');
+  let lineIdx = 0;
+
+  // Parse optional YAML frontmatter
+  let title = '';
+  if (lines[0]?.trim() === '---') {
+    lineIdx = 1;
+    while (lineIdx < lines.length && lines[lineIdx].trim() !== '---') {
+      const fmMatch = lines[lineIdx].match(/^(\w+):\s*(.*)/);
+      if (fmMatch && fmMatch[1] === 'title') {
+        title = fmMatch[2].trim();
+      }
+      lineIdx++;
+    }
+    lineIdx++; // skip closing ---
+  }
+
+  const rootId = 'node_root';
+  const nodes: Record<string, MindmapNode> = {};
+
+  // Stack tracks the current path in the tree: { id, depth }
+  // Depth: root=0, ##=1, ###=2, list items start at heading depth + 1
+  interface StackItem { id: string; depth: number; }
+  const stack: StackItem[] = [];
+
+  // Helper to create a node and wire it to its parent
+  function addNode(text: string, depth: number, meta: ParsedMeta): string {
+    const isRoot = stack.length === 0;
+    const id = isRoot ? rootId : generateNodeId();
+
+    // Pop stack to find parent at depth - 1
+    while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+      stack.pop();
+    }
+    const parentId = stack.length > 0 ? stack[stack.length - 1].id : null;
+
+    nodes[id] = {
+      id,
+      text,
+      note: '',
+      parentId,
+      childIds: [],
+      position: { x: 0, y: 0 },
+      tags: meta.tags,
+      status: meta.status,
+      color: meta.color,
+    };
+
+    if (parentId && nodes[parentId]) {
+      nodes[parentId].childIds.push(id);
+    }
+
+    stack.push({ id, depth });
+    return id;
+  }
+
+  // Track the current "heading base depth" for list items under a heading
+  // e.g., under ##, list items at indent 0 are depth 2; under ###, depth 3
+  let listBaseDepth = 1; // default: lists under root are depth 1
+
+  while (lineIdx < lines.length) {
+    const line = lines[lineIdx];
+    lineIdx++;
+
+    // Skip blank lines
+    if (!line.trim()) continue;
+
+    // Blockquote note: attach to the last node on the stack
+    if (line.match(/^\s*>/)) {
+      if (stack.length > 0) {
+        const lastNode = nodes[stack[stack.length - 1].id];
+        if (lastNode) {
+          const noteText = line.replace(/^\s*>\s?/, '');
+          lastNode.note = lastNode.note ? lastNode.note + '\n' + noteText : noteText;
+        }
+      }
+      continue;
+    }
+
+    // Heading: # (root, depth 0), ## (depth 1), ### (depth 2)
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)/);
+    if (headingMatch) {
+      const level = headingMatch[1].length; // 1, 2, or 3
+      const depth = level - 1; // # = 0, ## = 1, ### = 2
+      const meta = parseInlineMetadata(headingMatch[2].trim());
+      addNode(meta.text, depth, meta);
+      listBaseDepth = depth + 1;
+      continue;
+    }
+
+    // List item: - or * with indentation
+    const listMatch = line.match(/^(\s*)[-*]\s+(.*)/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const listDepth = listBaseDepth + Math.floor(indent / 2);
+      const meta = parseInlineMetadata(listMatch[2].trim());
+      addNode(meta.text, listDepth, meta);
+      continue;
+    }
+  }
+
+  // If no root was created, make a default
+  if (!nodes[rootId]) {
+    return createEmptyDocument();
+  }
+
+  if (!title) {
+    title = nodes[rootId].text;
+  }
+
+  return {
+    version: 1,
+    title,
+    rootId,
+    nodes,
+    metadata: {
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      canvas: { viewport: { x: 0, y: 0, zoom: 1 } },
+    },
+  };
+}
+
+// --- Markdown Serializer ---
+
+export function serializeDocument(doc: MindmapDocument): string {
+  const lines: string[] = [];
+
+  // Frontmatter
+  lines.push('---');
+  lines.push(`title: ${doc.title}`);
+  lines.push('---');
+  lines.push('');
+
+  function serializeNode(nodeId: string, depth: number): void {
+    const node = doc.nodes[nodeId];
+    if (!node) return;
+
+    const meta = formatInlineMetadata(node);
+
+    if (depth <= 2) {
+      // Use headings for depths 0-2: #, ##, ###
+      const prefix = '#'.repeat(depth + 1);
+      lines.push(`${prefix} ${node.text}${meta}`);
+    } else {
+      // Use list items for depth 3+
+      const indent = '  '.repeat(depth - 3); // depth 3 = no indent, depth 4 = 2 spaces, etc.
+      lines.push(`${indent}- ${node.text}${meta}`);
+    }
+
+    // Note as blockquote
+    if (node.note) {
+      const noteLines = node.note.split('\n');
+      for (const noteLine of noteLines) {
+        if (depth <= 2) {
+          lines.push(`> ${noteLine}`);
+        } else {
+          const indent = '  '.repeat(depth - 3);
+          lines.push(`${indent}  > ${noteLine}`);
+        }
+      }
+    }
+
+    // Blank line after headings for readability
+    if (depth <= 2 && node.childIds.length > 0) {
+      // Only add blank line after heading if next child is also a heading
+      const firstChild = doc.nodes[node.childIds[0]];
+      if (firstChild && depth + 1 <= 2) {
+        lines.push('');
+      }
+    }
+
+    for (const childId of node.childIds) {
+      serializeNode(childId, depth + 1);
+    }
+
+    // Blank line after top-level sections
+    if (depth === 1) {
+      lines.push('');
+    }
+  }
+
+  serializeNode(doc.rootId, 0);
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+}
+
+// --- Layout algorithm (balanced mindmap layout) ---
+
+interface LayoutResult {
+  positions: Record<string, { x: number; y: number }>;
+}
+
+const NODE_WIDTH = 160;
+const NODE_HEIGHT = 48;
+const H_SPACING = 70;
+const V_SPACING = 20;
+
+interface SubtreeSize {
+  width: number;
+  height: number;
+}
+
+function getSubtreeSize(
+  nodeId: string,
+  nodes: Record<string, MindmapNode>,
+  collapsed: Set<string>
+): SubtreeSize {
+  const node = nodes[nodeId];
+  if (!node || collapsed.has(nodeId) || node.childIds.length === 0) {
+    return { width: NODE_WIDTH, height: NODE_HEIGHT };
+  }
+
+  let totalChildHeight = 0;
+  let maxChildWidth = 0;
+  for (const childId of node.childIds) {
+    const childSize = getSubtreeSize(childId, nodes, collapsed);
+    totalChildHeight += childSize.height;
+    maxChildWidth = Math.max(maxChildWidth, childSize.width);
+  }
+  totalChildHeight += (node.childIds.length - 1) * V_SPACING;
+
+  return {
+    width: NODE_WIDTH + H_SPACING + maxChildWidth,
+    height: Math.max(NODE_HEIGHT, totalChildHeight),
+  };
+}
+
+function layoutSubtree(
+  nodeId: string,
+  x: number,
+  y: number,
+  nodes: Record<string, MindmapNode>,
+  collapsed: Set<string>,
+  positions: Record<string, { x: number; y: number }>,
+  direction: 'right' | 'left'
+): void {
+  const node = nodes[nodeId];
+  if (!node) return;
+
+  const subtreeSize = getSubtreeSize(nodeId, nodes, collapsed);
+  // Center the node vertically within its subtree
+  const nodeY = y + (subtreeSize.height - NODE_HEIGHT) / 2;
+  positions[nodeId] = { x, y: nodeY };
+
+  if (collapsed.has(nodeId) || node.childIds.length === 0) return;
+
+  const childX = direction === 'right'
+    ? x + NODE_WIDTH + H_SPACING
+    : x - NODE_WIDTH - H_SPACING;
+
+  let currentY = y;
+  for (const childId of node.childIds) {
+    const childSize = getSubtreeSize(childId, nodes, collapsed);
+    layoutSubtree(childId, childX, currentY, nodes, collapsed, positions, direction);
+    currentY += childSize.height + V_SPACING;
+  }
+}
+
+export function computeLayout(
+  doc: MindmapDocument,
+  collapsed: Set<string>
+): LayoutResult {
+  const positions: Record<string, { x: number; y: number }> = {};
+  const root = doc.nodes[doc.rootId];
+  if (!root) return { positions };
+
+  // Split children into left and right halves for balanced layout
+  const children = root.childIds.filter((id) => doc.nodes[id]);
+  const midpoint = Math.ceil(children.length / 2);
+  const rightChildren = children.slice(0, midpoint);
+  const leftChildren = children.slice(midpoint);
+
+  // Layout right side
+  let rightHeight = 0;
+  for (const childId of rightChildren) {
+    rightHeight += getSubtreeSize(childId, doc.nodes, collapsed).height + V_SPACING;
+  }
+  rightHeight -= V_SPACING;
+
+  let currentY = -rightHeight / 2;
+  for (const childId of rightChildren) {
+    const size = getSubtreeSize(childId, doc.nodes, collapsed);
+    layoutSubtree(childId, NODE_WIDTH + H_SPACING, currentY, doc.nodes, collapsed, positions, 'right');
+    currentY += size.height + V_SPACING;
+  }
+
+  // Layout left side
+  let leftHeight = 0;
+  for (const childId of leftChildren) {
+    leftHeight += getSubtreeSize(childId, doc.nodes, collapsed).height + V_SPACING;
+  }
+  leftHeight -= V_SPACING;
+
+  currentY = -leftHeight / 2;
+  for (const childId of leftChildren) {
+    const size = getSubtreeSize(childId, doc.nodes, collapsed);
+    layoutSubtree(childId, -(NODE_WIDTH + H_SPACING), currentY, doc.nodes, collapsed, positions, 'left');
+    currentY += size.height + V_SPACING;
+  }
+
+  // Root at center
+  positions[doc.rootId] = { x: 0, y: -NODE_HEIGHT / 2 };
+
+  return { positions };
+}
+
+// --- Reducer ---
+
+function pushUndo(state: EditorState): EditorState {
+  return {
+    ...state,
+    undoStack: [...state.undoStack.slice(-49), { ...state.document }],
+    redoStack: [],
+  };
+}
+
+function deleteNodeRecursive(
+  nodes: Record<string, MindmapNode>,
+  nodeId: string
+): Record<string, MindmapNode> {
+  const node = nodes[nodeId];
+  if (!node) return nodes;
+
+  let result = { ...nodes };
+  // Delete children first
+  for (const childId of node.childIds) {
+    result = deleteNodeRecursive(result, childId);
+  }
+  // Remove from parent's childIds
+  if (node.parentId && result[node.parentId]) {
+    result[node.parentId] = {
+      ...result[node.parentId],
+      childIds: result[node.parentId].childIds.filter((id) => id !== nodeId),
+    };
+  }
+  delete result[nodeId];
+  return result;
+}
+
+export function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case 'LOAD_DOCUMENT':
+      return {
+        ...state,
+        document: action.document,
+        selectedNodeId: action.document.rootId,
+        editingNodeId: null,
+        collapsedNodeIds: new Set(),
+        undoStack: [],
+        redoStack: [],
+      };
+
+    case 'SET_SELECTED':
+      return { ...state, selectedNodeId: action.nodeId, editingNodeId: null };
+
+    case 'SET_EDITING':
+      return { ...state, editingNodeId: action.nodeId };
+
+    case 'TOGGLE_COLLAPSE': {
+      const newCollapsed = new Set(state.collapsedNodeIds);
+      if (newCollapsed.has(action.nodeId)) {
+        newCollapsed.delete(action.nodeId);
+      } else {
+        newCollapsed.add(action.nodeId);
+      }
+      return { ...state, collapsedNodeIds: newCollapsed };
+    }
+
+    case 'UPDATE_NODE': {
+      const prev = pushUndo(state);
+      const node = prev.document.nodes[action.nodeId];
+      if (!node) return state;
+      return {
+        ...prev,
+        document: {
+          ...prev.document,
+          nodes: {
+            ...prev.document.nodes,
+            [action.nodeId]: { ...node, ...action.updates },
+          },
+        },
+      };
+    }
+
+    case 'CREATE_NODE': {
+      const prev = pushUndo(state);
+      const parent = prev.document.nodes[action.parentId];
+      if (!parent) return state;
+      const newChildIds = [...parent.childIds];
+      if (action.index !== undefined) {
+        newChildIds.splice(action.index, 0, action.node.id);
+      } else {
+        newChildIds.push(action.node.id);
+      }
+      return {
+        ...prev,
+        document: {
+          ...prev.document,
+          nodes: {
+            ...prev.document.nodes,
+            [action.parentId]: { ...parent, childIds: newChildIds },
+            [action.node.id]: action.node,
+          },
+        },
+        selectedNodeId: action.node.id,
+        editingNodeId: action.node.id,
+      };
+    }
+
+    case 'DELETE_NODE': {
+      if (action.nodeId === state.document.rootId) return state;
+      const prev = pushUndo(state);
+      const newNodes = deleteNodeRecursive(prev.document.nodes, action.nodeId);
+      const deletedNode = prev.document.nodes[action.nodeId];
+      return {
+        ...prev,
+        document: { ...prev.document, nodes: newNodes },
+        selectedNodeId: deletedNode?.parentId || state.document.rootId,
+        editingNodeId: null,
+      };
+    }
+
+    case 'MOVE_NODE': {
+      if (action.nodeId === state.document.rootId) return state;
+      const prev = pushUndo(state);
+      const node = prev.document.nodes[action.nodeId];
+      if (!node) return state;
+
+      // Check we're not moving to a descendant
+      let check: string | null = action.newParentId;
+      while (check) {
+        if (check === action.nodeId) return state;
+        check = prev.document.nodes[check]?.parentId ?? null;
+      }
+
+      let nodes = { ...prev.document.nodes };
+
+      // Remove from old parent
+      if (node.parentId && nodes[node.parentId]) {
+        nodes[node.parentId] = {
+          ...nodes[node.parentId],
+          childIds: nodes[node.parentId].childIds.filter((id) => id !== action.nodeId),
+        };
+      }
+
+      // Add to new parent
+      const newParent = nodes[action.newParentId];
+      if (!newParent) return state;
+      const newChildIds = [...newParent.childIds];
+      if (action.index !== undefined) {
+        newChildIds.splice(action.index, 0, action.nodeId);
+      } else {
+        newChildIds.push(action.nodeId);
+      }
+      nodes[action.newParentId] = { ...newParent, childIds: newChildIds };
+      nodes[action.nodeId] = { ...node, parentId: action.newParentId };
+
+      return {
+        ...prev,
+        document: { ...prev.document, nodes },
+      };
+    }
+
+    case 'REORDER_CHILDREN': {
+      const prev = pushUndo(state);
+      const parent = prev.document.nodes[action.parentId];
+      if (!parent) return state;
+      return {
+        ...prev,
+        document: {
+          ...prev.document,
+          nodes: {
+            ...prev.document.nodes,
+            [action.parentId]: { ...parent, childIds: action.childIds },
+          },
+        },
+      };
+    }
+
+    case 'REPLACE_DOCUMENT': {
+      const prev = pushUndo(state);
+      return {
+        ...prev,
+        document: action.document,
+        selectedNodeId: action.document.rootId,
+        editingNodeId: null,
+      };
+    }
+
+    case 'UPDATE_POSITIONS': {
+      const nodes = { ...state.document.nodes };
+      for (const [id, pos] of Object.entries(action.positions)) {
+        if (nodes[id]) {
+          nodes[id] = { ...nodes[id], position: pos };
+        }
+      }
+      return {
+        ...state,
+        document: { ...state.document, nodes },
+      };
+    }
+
+    case 'UNDO': {
+      if (state.undoStack.length === 0) return state;
+      const previous = state.undoStack[state.undoStack.length - 1];
+      return {
+        ...state,
+        document: previous,
+        undoStack: state.undoStack.slice(0, -1),
+        redoStack: [...state.redoStack, state.document],
+      };
+    }
+
+    case 'REDO': {
+      if (state.redoStack.length === 0) return state;
+      const next = state.redoStack[state.redoStack.length - 1];
+      return {
+        ...state,
+        document: next,
+        redoStack: state.redoStack.slice(0, -1),
+        undoStack: [...state.undoStack, state.document],
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+export function createInitialState(doc: MindmapDocument): EditorState {
+  return {
+    document: doc,
+    selectedNodeId: doc.rootId,
+    editingNodeId: null,
+    collapsedNodeIds: new Set(),
+    undoStack: [],
+    redoStack: [],
+  };
+}
