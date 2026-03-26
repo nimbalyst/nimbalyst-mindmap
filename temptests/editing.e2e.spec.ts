@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_FILE = path.resolve(__dirname, '../sample.mindmap');
-const EXTENSION_ID = 'com.developer.nimbalyst-mindmap';
+const EXTENSION_ID = 'com.nimbalyst.mindmap';
 
 test('double-click a node, type new text, commit with Enter', async ({ page }) => {
   const editor = extensionEditor(page, EXTENSION_ID, SAMPLE_FILE);

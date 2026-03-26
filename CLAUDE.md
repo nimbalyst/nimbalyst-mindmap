@@ -2,7 +2,7 @@
 
 This is a **Nimbalyst extension** project. Nimbalyst is an extensible, AI-native workspace and code editor. Extensions add custom editors, AI tools, panels, themes, and more.
 
-- **Extension ID**: `com.developer.nimbalyst-mindmap`
+- **Extension ID**: `com.nimbalyst.mindmap`
 - **Template**: `custom-editor`
 - **File patterns**: `*.example`
 
@@ -20,7 +20,7 @@ Extensions are built with Vite and installed into the running Nimbalyst app usin
 
 **Typical iteration loop:**
 1. Edit source files
-2. Run `extension_reload` with `extensionId: "com.developer.nimbalyst-mindmap"` and `path` set to this project root
+2. Run `extension_reload` with `extensionId: "com.nimbalyst.mindmap"` and `path` set to this project root
 3. Test in Nimbalyst immediately
 
 **First-time setup:**
@@ -29,7 +29,7 @@ Extensions are built with Vite and installed into the running Nimbalyst app usin
 
 ### Debugging
 
-- Check extension load status: `extension_get_status` with `extensionId: "com.developer.nimbalyst-mindmap"`
+- Check extension load status: `extension_get_status` with `extensionId: "com.nimbalyst.mindmap"`
 - Main process logs: `mcp__nimbalyst-extension-dev__get_main_process_logs` (filter by component: "EXTENSION")
 - Renderer logs: `mcp__nimbalyst-extension-dev__get_renderer_debug_logs`
 - Verify the result visually: `mcp__nimbalyst-mcp__capture_editor_screenshot`
@@ -169,7 +169,7 @@ claude-plugin/
 
 ```json
 {
-  "name": "com-developer-nimbalyst-mindmap",
+  "name": "com-nimbalyst-mindmap",
   "version": "1.0.0",
   "description": "Claude Code plugin for Nimbalyst Mindmap",
   "keywords": []
