@@ -305,10 +305,34 @@ interface LayoutResult {
   positions: Record<string, { x: number; y: number }>;
 }
 
-const NODE_WIDTH = 160;
+const DEFAULT_NODE_WIDTH = 160;
 const NODE_HEIGHT = 48;
+const TAG_ROW_HEIGHT = 20;
 const H_SPACING = 70;
 const V_SPACING = 20;
+const MAX_NODE_WIDTH = 260;
+const CHAR_WIDTH = 7.5; // approximate px per character at 13px font
+const NODE_H_PADDING = 28; // 14px padding each side
+const STATUS_ICON_WIDTH = 22; // icon + gap
+const COLLAPSE_BTN_WIDTH = 20;
+
+/** Estimate the rendered width of a node based on its text content */
+export function estimateNodeWidth(node: MindmapNode, isRoot: boolean): number {
+  const text = node.text || 'Untitled';
+  let width = NODE_H_PADDING + text.length * CHAR_WIDTH;
+  if (node.status !== 'none') width += STATUS_ICON_WIDTH;
+  if (node.childIds.length > 0) width += COLLAPSE_BTN_WIDTH;
+  if (isRoot) {
+    // Root has larger padding (22px each side) and larger font (~8.5px/char)
+    width = 44 + text.length * 8.5;
+  }
+  return Math.max(80, Math.min(MAX_NODE_WIDTH, Math.round(width)));
+}
+
+/** Estimate the rendered height of a node (accounts for tag rows) */
+function estimateNodeHeight(node: MindmapNode): number {
+  return node.tags.length > 0 ? NODE_HEIGHT + TAG_ROW_HEIGHT : NODE_HEIGHT;
+}
 
 interface SubtreeSize {
   width: number;
@@ -318,25 +342,31 @@ interface SubtreeSize {
 function getSubtreeSize(
   nodeId: string,
   nodes: Record<string, MindmapNode>,
-  collapsed: Set<string>
+  collapsed: Set<string>,
+  rootId: string
 ): SubtreeSize {
   const node = nodes[nodeId];
-  if (!node || collapsed.has(nodeId) || node.childIds.length === 0) {
-    return { width: NODE_WIDTH, height: NODE_HEIGHT };
+  if (!node) return { width: DEFAULT_NODE_WIDTH, height: NODE_HEIGHT };
+
+  const nodeWidth = estimateNodeWidth(node, nodeId === rootId);
+  const nodeHeight = estimateNodeHeight(node);
+
+  if (collapsed.has(nodeId) || node.childIds.length === 0) {
+    return { width: nodeWidth, height: nodeHeight };
   }
 
   let totalChildHeight = 0;
   let maxChildWidth = 0;
   for (const childId of node.childIds) {
-    const childSize = getSubtreeSize(childId, nodes, collapsed);
+    const childSize = getSubtreeSize(childId, nodes, collapsed, rootId);
     totalChildHeight += childSize.height;
     maxChildWidth = Math.max(maxChildWidth, childSize.width);
   }
   totalChildHeight += (node.childIds.length - 1) * V_SPACING;
 
   return {
-    width: NODE_WIDTH + H_SPACING + maxChildWidth,
-    height: Math.max(NODE_HEIGHT, totalChildHeight),
+    width: nodeWidth + H_SPACING + maxChildWidth,
+    height: Math.max(nodeHeight, totalChildHeight),
   };
 }
 
@@ -347,26 +377,31 @@ function layoutSubtree(
   nodes: Record<string, MindmapNode>,
   collapsed: Set<string>,
   positions: Record<string, { x: number; y: number }>,
-  direction: 'right' | 'left'
+  direction: 'right' | 'left',
+  rootId: string
 ): void {
   const node = nodes[nodeId];
   if (!node) return;
 
-  const subtreeSize = getSubtreeSize(nodeId, nodes, collapsed);
+  const subtreeSize = getSubtreeSize(nodeId, nodes, collapsed, rootId);
+  const nodeHeight = estimateNodeHeight(node);
   // Center the node vertically within its subtree
-  const nodeY = y + (subtreeSize.height - NODE_HEIGHT) / 2;
+  const nodeY = y + (subtreeSize.height - nodeHeight) / 2;
   positions[nodeId] = { x, y: nodeY };
 
   if (collapsed.has(nodeId) || node.childIds.length === 0) return;
 
-  const childX = direction === 'right'
-    ? x + NODE_WIDTH + H_SPACING
-    : x - NODE_WIDTH - H_SPACING;
+  const nodeWidth = estimateNodeWidth(node, nodeId === rootId);
 
   let currentY = y;
   for (const childId of node.childIds) {
-    const childSize = getSubtreeSize(childId, nodes, collapsed);
-    layoutSubtree(childId, childX, currentY, nodes, collapsed, positions, direction);
+    const childNode = nodes[childId];
+    const childSize = getSubtreeSize(childId, nodes, collapsed, rootId);
+    const childWidth = childNode ? estimateNodeWidth(childNode, false) : DEFAULT_NODE_WIDTH;
+    const childX = direction === 'right'
+      ? x + nodeWidth + H_SPACING
+      : x - H_SPACING - childWidth;
+    layoutSubtree(childId, childX, currentY, nodes, collapsed, positions, direction, rootId);
     currentY += childSize.height + V_SPACING;
   }
 }
@@ -379,6 +414,8 @@ export function computeLayout(
   const root = doc.nodes[doc.rootId];
   if (!root) return { positions };
 
+  const rootWidth = estimateNodeWidth(root, true);
+
   // Split children into left and right halves for balanced layout
   const children = root.childIds.filter((id) => doc.nodes[id]);
   const midpoint = Math.ceil(children.length / 2);
@@ -388,33 +425,36 @@ export function computeLayout(
   // Layout right side
   let rightHeight = 0;
   for (const childId of rightChildren) {
-    rightHeight += getSubtreeSize(childId, doc.nodes, collapsed).height + V_SPACING;
+    rightHeight += getSubtreeSize(childId, doc.nodes, collapsed, doc.rootId).height + V_SPACING;
   }
-  rightHeight -= V_SPACING;
+  if (rightChildren.length > 0) rightHeight -= V_SPACING;
 
   let currentY = -rightHeight / 2;
   for (const childId of rightChildren) {
-    const size = getSubtreeSize(childId, doc.nodes, collapsed);
-    layoutSubtree(childId, NODE_WIDTH + H_SPACING, currentY, doc.nodes, collapsed, positions, 'right');
+    const size = getSubtreeSize(childId, doc.nodes, collapsed, doc.rootId);
+    layoutSubtree(childId, rootWidth + H_SPACING, currentY, doc.nodes, collapsed, positions, 'right', doc.rootId);
     currentY += size.height + V_SPACING;
   }
 
   // Layout left side
   let leftHeight = 0;
   for (const childId of leftChildren) {
-    leftHeight += getSubtreeSize(childId, doc.nodes, collapsed).height + V_SPACING;
+    leftHeight += getSubtreeSize(childId, doc.nodes, collapsed, doc.rootId).height + V_SPACING;
   }
-  leftHeight -= V_SPACING;
+  if (leftChildren.length > 0) leftHeight -= V_SPACING;
 
   currentY = -leftHeight / 2;
   for (const childId of leftChildren) {
-    const size = getSubtreeSize(childId, doc.nodes, collapsed);
-    layoutSubtree(childId, -(NODE_WIDTH + H_SPACING), currentY, doc.nodes, collapsed, positions, 'left');
+    const size = getSubtreeSize(childId, doc.nodes, collapsed, doc.rootId);
+    const childNode = doc.nodes[childId];
+    const childWidth = childNode ? estimateNodeWidth(childNode, false) : DEFAULT_NODE_WIDTH;
+    layoutSubtree(childId, -(H_SPACING + childWidth), currentY, doc.nodes, collapsed, positions, 'left', doc.rootId);
     currentY += size.height + V_SPACING;
   }
 
   // Root at center
-  positions[doc.rootId] = { x: 0, y: -NODE_HEIGHT / 2 };
+  const rootHeight = estimateNodeHeight(root);
+  positions[doc.rootId] = { x: 0, y: -rootHeight / 2 };
 
   return { positions };
 }
