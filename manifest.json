@@ -40,6 +40,13 @@
         "supportsSourceMode": true
       }
     ],
+    "aiTools": [
+      "mindmap.get_document",
+      "mindmap.add_node",
+      "mindmap.update_node",
+      "mindmap.delete_node",
+      "mindmap.move_node"
+    ],
     "newFileMenu": [
       {
         "extension": ".mindmap",

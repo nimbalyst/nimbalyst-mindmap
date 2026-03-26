@@ -1,5 +1,8 @@
 import { MindmapEditor } from './MindmapEditor';
+import { aiTools } from './aiTools';
 import './styles.css';
+
+export { aiTools };
 
 export const components = {
   MindmapEditor,

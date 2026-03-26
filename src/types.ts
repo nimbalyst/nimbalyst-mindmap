@@ -1,5 +1,26 @@
 // Mindmap document types
 
+// Imperative API exposed to AI tools via host.registerEditorAPI()
+export interface MindmapEditorAPI {
+  getDocument(): MindmapDocument;
+  addNode(parentId: string, text: string, options?: {
+    color?: NodeColor;
+    status?: NodeStatus;
+    tags?: string[];
+    note?: string;
+    index?: number;
+  }): string; // returns new node ID
+  updateNode(nodeId: string, updates: {
+    text?: string;
+    color?: NodeColor;
+    status?: NodeStatus;
+    tags?: string[];
+    note?: string;
+  }): void;
+  deleteNode(nodeId: string): void;
+  moveNode(nodeId: string, newParentId: string, index?: number): void;
+}
+
 export interface MindmapNode {
   id: string;
   text: string;

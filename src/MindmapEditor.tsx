@@ -13,7 +13,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react';
 import { useEditorLifecycle, type EditorHostProps } from '@nimbalyst/extension-sdk';
-import type { MindmapNode, EditorAction } from './types';
+import type { MindmapNode, MindmapEditorAPI, EditorAction } from './types';
 import {
   parseDocument,
   serializeDocument,
@@ -22,6 +22,7 @@ import {
   createInitialState,
   computeLayout,
   generateNodeId,
+  estimateNodeWidth,
 } from './model';
 import { MindmapNodeComponent, type MindmapNodeData } from './MindmapNode';
 import { MindmapEdge } from './MindmapEdge';
@@ -48,6 +49,8 @@ function MindmapCanvas({
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  const readOnly = host.readOnly ?? false;
+
   const { markDirty, isLoading, theme, diffState } = useEditorLifecycle(host, {
     applyContent: (doc) => {
       dispatch({ type: 'LOAD_DOCUMENT', document: doc });
@@ -60,6 +63,53 @@ function MindmapCanvas({
       setNeedsLayout(true);
     },
   });
+
+  // Register imperative API for AI tools
+  useEffect(() => {
+    const api: MindmapEditorAPI = {
+      getDocument: () => stateRef.current.document,
+      addNode: (parentId, text, options) => {
+        const parent = stateRef.current.document.nodes[parentId];
+        if (!parent) throw new Error(`Parent node ${parentId} not found`);
+        const newId = generateNodeId();
+        const newNode: MindmapNode = {
+          id: newId,
+          text,
+          note: options?.note ?? '',
+          parentId,
+          childIds: [],
+          position: { x: parent.position.x + 220, y: parent.position.y },
+          tags: options?.tags ?? [],
+          status: options?.status ?? 'none',
+          color: options?.color ?? 'default',
+        };
+        dispatch({ type: 'CREATE_NODE', parentId, node: newNode, index: options?.index });
+        setNeedsLayout(true);
+        markDirty();
+        return newId;
+      },
+      updateNode: (nodeId, updates) => {
+        if (!stateRef.current.document.nodes[nodeId]) throw new Error(`Node ${nodeId} not found`);
+        dispatch({ type: 'UPDATE_NODE', nodeId, updates });
+        markDirty();
+      },
+      deleteNode: (nodeId) => {
+        if (nodeId === stateRef.current.document.rootId) throw new Error('Cannot delete root node');
+        if (!stateRef.current.document.nodes[nodeId]) throw new Error(`Node ${nodeId} not found`);
+        dispatch({ type: 'DELETE_NODE', nodeId });
+        setNeedsLayout(true);
+        markDirty();
+      },
+      moveNode: (nodeId, newParentId, index) => {
+        if (nodeId === stateRef.current.document.rootId) throw new Error('Cannot move root node');
+        dispatch({ type: 'MOVE_NODE', nodeId, newParentId, index });
+        setNeedsLayout(true);
+        markDirty();
+      },
+    };
+    host.registerEditorAPI(api);
+    return () => host.registerEditorAPI(null);
+  }, [host, dispatch, markDirty]);
 
   // When AI edits trigger diff mode, apply the modified content so it renders
   useEffect(() => {
@@ -245,6 +295,28 @@ function MindmapCanvas({
       const selectedNode = state.document.nodes[selectedNodeId];
       if (!selectedNode) return;
 
+      // In read-only mode, only allow navigation and collapse/expand
+      if (readOnly) {
+        switch (e.key) {
+          case ' ':
+            e.preventDefault();
+            dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: selectedNodeId });
+            setNeedsLayout(true);
+            break;
+          case 'ArrowUp':
+          case 'ArrowDown':
+          case 'ArrowLeft':
+          case 'ArrowRight':
+            e.preventDefault();
+            navigateNode(e.key, selectedNode, state.document);
+            break;
+          case 'Escape':
+            dispatch({ type: 'SET_SELECTED', nodeId: state.document.rootId });
+            break;
+        }
+        return;
+      }
+
       switch (e.key) {
         case 'Tab': {
           e.preventDefault();
@@ -324,7 +396,7 @@ function MindmapCanvas({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [state, createChild, createSibling, dispatch, startEditing, markDirty]);
+  }, [state, readOnly, createChild, createSibling, dispatch, startEditing, markDirty]);
 
   // Arrow key navigation
   const navigateNode = useCallback(
@@ -409,7 +481,7 @@ function MindmapCanvas({
         isCollapsed,
         isLeftSide: leftSide,
         childCount: node.childIds.length,
-        onStartEditing: handleStartEditing,
+        onStartEditing: readOnly ? undefined : handleStartEditing,
         onToggleCollapse: handleToggleCollapse,
         onSelect: handleSelect,
       };
@@ -421,7 +493,10 @@ function MindmapCanvas({
         data: nodeData as Record<string, unknown>,
         selected: nodeId === selectedNodeId,
         // Explicit dimensions for MiniMap (getBoundingClientRect returns 0 in extension host)
-        measured: { width: nodeId === doc.rootId ? 200 : 160, height: 48 },
+        measured: {
+          width: estimateNodeWidth(node, nodeId === doc.rootId),
+          height: node.tags.length > 0 ? 68 : 48,
+        },
       });
 
       for (const childId of visibleChildIds) {
@@ -619,20 +694,24 @@ function MindmapCanvas({
           >
             Search
           </button>
-          <button
-            className="mindmap-toolbar-btn"
-            onClick={() => setShowOutline(!showOutline)}
-            title="Toggle outline"
-          >
-            {showOutline ? 'Hide Outline' : 'Outline'}
-          </button>
-          <button
-            className="mindmap-toolbar-btn"
-            onClick={handleAutoLayout}
-            title="Auto-layout all nodes"
-          >
-            Auto Layout
-          </button>
+          {!readOnly && (
+            <button
+              className="mindmap-toolbar-btn"
+              onClick={() => setShowOutline(!showOutline)}
+              title="Toggle outline"
+            >
+              {showOutline ? 'Hide Outline' : 'Outline'}
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              className="mindmap-toolbar-btn"
+              onClick={handleAutoLayout}
+              title="Auto-layout all nodes"
+            >
+              Auto Layout
+            </button>
+          )}
           <button
             className="mindmap-toolbar-btn"
             onClick={() => fitView({ padding: 0.2, duration: 300 })}
@@ -645,7 +724,7 @@ function MindmapCanvas({
 
       <div className="mindmap-body">
         {/* Outline panel */}
-        {showOutline && (
+        {showOutline && !readOnly && (
           <OutlinePanel
             document={state.document}
             selectedNodeId={state.selectedNodeId}
@@ -663,8 +742,8 @@ function MindmapCanvas({
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            onNodesChange={onNodesChange}
-            onNodeDragStop={onNodeDragStop}
+            onNodesChange={readOnly ? undefined : onNodesChange}
+            onNodeDragStop={readOnly ? undefined : onNodeDragStop}
             onInit={handleReactFlowInit}
             onPaneClick={() => dispatch({ type: 'SET_SELECTED', nodeId: null })}
             minZoom={0.1}
@@ -674,6 +753,8 @@ function MindmapCanvas({
             selectionOnDrag={false}
             panOnDrag
             selectNodesOnDrag={false}
+            nodesDraggable={!readOnly}
+            nodesConnectable={false}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -697,14 +778,16 @@ function MindmapCanvas({
           </ReactFlow>
 
           {/* Inline edit overlay -- lives outside React Flow to avoid re-render issues */}
-          <EditOverlay
-            editing={editOverlay}
-            onCommit={handleEditCommit}
-            onCancel={handleEditCancel}
-          />
+          {!readOnly && (
+            <EditOverlay
+              editing={editOverlay}
+              onCommit={handleEditCommit}
+              onCancel={handleEditCancel}
+            />
+          )}
 
           {/* Empty state overlay */}
-          {isEmptyMap && (
+          {isEmptyMap && !readOnly && (
             <div className="mindmap-empty-overlay">
               <div className="mindmap-empty-content">
                 <div className="mindmap-empty-title">Start your mindmap</div>
@@ -730,8 +813,8 @@ function MindmapCanvas({
           )}
         </div>
 
-        {/* Inspector -- only shown when a node is selected */}
-        {selectedNode && (
+        {/* Inspector -- only shown when a node is selected (not in read-only mode) */}
+        {selectedNode && !readOnly && (
           <Inspector node={selectedNode} dispatch={dispatch} onDirty={markDirty} />
         )}
       </div>
