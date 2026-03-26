@@ -9,7 +9,7 @@ export interface MindmapNodeData {
   isCollapsed: boolean;
   isLeftSide: boolean;
   childCount: number;
-  onStartEditing: (nodeId: string) => void;
+  onStartEditing?: (nodeId: string) => void;
   onToggleCollapse: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
 }
@@ -50,7 +50,7 @@ export function MindmapNodeComponent({ data, id }: NodeProps) {
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      d.onStartEditing(id);
+      d.onStartEditing?.(id);
     },
     [d, id]
   );
