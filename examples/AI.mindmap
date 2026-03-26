@@ -41,3 +41,30 @@ title: AI & AI Research
 - Adversarial testing {tags: safety, priority}
 ### Interpretability {status: in-progress}
 - Mechanistic interpretability
+
+## Use Cases {color: green}
+
+### Healthcare
+> Diagnostics, drug discovery, and patient care.
+- Medical imaging analysis {status: done}
+- Drug discovery and molecular design
+- Clinical decision support {status: in-progress}
+### Autonomous Vehicles {tags: robotics, safety}
+> Self-driving cars, drones, and navigation.
+- Perception and sensor fusion
+- Motion planning
+### Natural Language Processing
+> Text understanding, generation, and translation.
+- Machine translation {status: done}
+- Summarization and question answering
+- Code generation {status: in-progress}
+### Creative Arts
+> AI-assisted content creation.
+- Music composition
+- Image and video generation {tags: diffusion}
+- Writing assistance
+### Science & Engineering
+> Accelerating discovery and design.
+- Protein structure prediction {status: done}
+- Climate modeling
+- Materials discovery {status: todo}
