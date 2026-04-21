@@ -41,6 +41,7 @@ function MindmapCanvas({
   const [state, dispatch] = useReducer(editorReducer, createInitialState(createEmptyDocument()));
   const [showOutline, setShowOutline] = useState(false);
   const [needsLayout, setNeedsLayout] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const { fitView } = useReactFlow();
   const pendingFitViewRef = useRef(false);
   const reactFlowReadyRef = useRef(false);
@@ -745,7 +746,7 @@ function MindmapCanvas({
             onNodesChange={readOnly ? undefined : onNodesChange}
             onNodeDragStop={readOnly ? undefined : onNodeDragStop}
             onInit={handleReactFlowInit}
-            onPaneClick={() => dispatch({ type: 'SET_SELECTED', nodeId: null })}
+            onPaneClick={() => { dispatch({ type: 'SET_SELECTED', nodeId: null }); setOnboardingDismissed(true); }}
             minZoom={0.1}
             maxZoom={3}
             defaultEdgeOptions={{ type: 'mindmap' }}
