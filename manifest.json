@@ -26,7 +26,7 @@
     "screenshots": [
       {
         "alt": "Mindmap editor showing hierarchical knowledge map with color-coded branches",
-        "fileToOpen": "samples/demo.mindmap"
+        "fileToOpen": "examples/launch-strategy.mindmap"
       }
     ]
   },

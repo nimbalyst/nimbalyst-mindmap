@@ -1,0 +1,39 @@
+---
+title: Launch Strategy
+---
+
+# Launch Strategy
+> Outline for a new product release across positioning, launch assets, rollout, and measurement.
+
+## Positioning {color: blue}
+- Core message
+- Audience segments {tags: growth, product}
+  - Team leads
+  - Operators
+  - Technical evaluators
+- Differentiators {status: in-progress}
+
+## Launch Assets {color: purple}
+- Landing page
+- Demo script
+- Announcement post
+- Customer quotes {status: todo}
+
+## Rollout Plan {color: green}
+- Internal enablement
+- Beta launch {status: done}
+- Public release {status: in-progress}
+  - Changelog
+  - Email campaign
+  - Social cutdowns
+
+## Measurement {color: orange}
+- Activation rate
+- Demo-to-trial conversion
+- Team invites
+- Feedback themes {tags: research}
+
+## Risks {color: red}
+- Message drift
+- Asset delays
+- Support load {status: question}

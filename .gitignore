@@ -1,6 +1,7 @@
 node_modules/
 coverage/
 dist/
+.agents/
 .idea/
 *.log
 npm-debug.log*
