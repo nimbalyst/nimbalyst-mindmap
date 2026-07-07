@@ -38,7 +38,12 @@
         ],
         "displayName": "Nimbalyst Mindmap",
         "component": "MindmapEditor",
-        "supportsSourceMode": true
+        "supportsSourceMode": true,
+        "supportsTranscriptEmbed": true,
+        "collaboration": {
+          "supported": true,
+          "awarenessFields": ["selectedNodeId", "editingNodeId"]
+        }
       }
     ],
     "aiTools": [

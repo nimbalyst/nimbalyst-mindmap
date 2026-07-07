@@ -12,7 +12,11 @@ import {
   type NodeDragHandler,
   BackgroundVariant,
 } from '@xyflow/react';
-import { useEditorLifecycle, type EditorHostProps } from '@nimbalyst/extension-sdk';
+import {
+  useEditorLifecycle,
+  useCollaborativeEditor,
+  type EditorHostProps,
+} from '@nimbalyst/extension-sdk';
 import type { MindmapNode, MindmapEditorAPI, EditorAction } from './types';
 import {
   parseDocument,
@@ -29,6 +33,8 @@ import { MindmapEdge } from './MindmapEdge';
 import { EditOverlay } from './EditOverlay';
 import { Inspector } from './Inspector';
 import { OutlinePanel } from './OutlinePanel';
+import { MindmapBinding } from './collab/mindmapBinding';
+import { mindmapCodec } from './collab/codec';
 
 import '@xyflow/react/dist/style.css';
 
@@ -54,6 +60,12 @@ function MindmapCanvas({
 
   const { markDirty, isLoading, theme, diffState } = useEditorLifecycle(host, {
     applyContent: (doc) => {
+      // Collab mode: the Y.Doc is authoritative and there is no local file --
+      // the host's loadContent returns '' which parses to the DEFAULT document.
+      // Applying that into the reducer AFTER the binding's REPLACE_DOCUMENT
+      // forwards a default doc with a CURRENT collabEpoch and mass-deletes the
+      // shared room (the "shows content for a moment, then empty" clobber).
+      if (host.collaboration) return;
       dispatch({ type: 'LOAD_DOCUMENT', document: doc });
       setNeedsLayout(true);
     },
@@ -64,6 +76,80 @@ function MindmapCanvas({
       setNeedsLayout(true);
     },
   });
+
+  // ---- Collaborative wiring (no-op when host.collaboration is undefined) ---
+  // The binding wraps the Y.Doc, forwards every local document state to the
+  // shared Y.Doc as a minimal diff, and dispatches REPLACE_DOCUMENT for
+  // remote changes. The hook creates the binding once after sync (and
+  // seeding, if this client is first); we stash it in a ref so the rest of
+  // the editor (awareness fields, local-document forwarding) can read it.
+  const bindingRef = useRef<MindmapBinding | null>(null);
+  // Bump on every remote state change so a re-render picks up the badges.
+  const [, forceRender] = useReducer((x) => x + 1, 0);
+  const { isCollaborative } = useCollaborativeEditor(host, {
+    // Delegate emptiness + seeding to the single pure codec so the live seed
+    // and the host's headless seed are provably the same code.
+    isEmpty: (yDoc) => mindmapCodec.isEmpty(yDoc),
+    initializeFromContent: (yDoc, content) =>
+      mindmapCodec.seedFromFile(
+        yDoc,
+        typeof content === 'string' ? content : new Uint8Array(content),
+      ),
+    createBinding: ({ yDoc, awareness }) => {
+      const binding = new MindmapBinding(
+        yDoc,
+        stateRef.current.document,
+        {
+          onRemoteDocument: (doc, epoch) => {
+            dispatch({ type: 'REPLACE_DOCUMENT', document: doc, collabEpoch: epoch });
+            setNeedsLayout(true);
+          },
+          onRemoteAwareness: () => forceRender(),
+        },
+        awareness,
+      );
+      bindingRef.current = binding;
+      return {
+        destroy: () => {
+          binding.destroy();
+          bindingRef.current = null;
+        },
+      };
+    },
+  });
+
+  // Forward local document states to the Y.Doc when collab is active. The
+  // epoch check is the anti-clobber invariant (NIM-1521): a state is only
+  // forwarded when it has absorbed the binding's latest remote snapshot
+  // (state.collabEpoch === binding.getEpoch()). A stale state -- e.g. the
+  // initial default document plus an auto-layout commit that lands before
+  // REPLACE_DOCUMENT is processed -- would otherwise diff against the newer
+  // baseline and mass-delete every remote node (observed live: a re-uploaded
+  // mindmap reverted to an empty "Untitled map" within seconds). This also
+  // subsumes echo suppression: forwarding the REPLACE state itself is a no-op
+  // diff against the identical baseline.
+  useEffect(() => {
+    const binding = bindingRef.current;
+    if (!binding) return;
+    if (state.collabEpoch !== binding.getEpoch()) return;
+    binding.applyLocalDocument(state.document);
+  }, [state.document, state.collabEpoch]);
+
+  // Publish selection / editing to awareness when in collab mode.
+  useEffect(() => {
+    const binding = bindingRef.current;
+    if (!binding) return;
+    binding.setLocalAwareness({
+      selectedNodeId: state.selectedNodeId,
+      editingNodeId: state.editingNodeId,
+    });
+  }, [state.selectedNodeId, state.editingNodeId]);
+
+  // Future: pipe `bindingRef.current?.getRemoteEditingByUser()` into the
+  // node renderer to draw "X is editing this node" badges. The awareness
+  // wire is in place; the UI integration belongs to a follow-up touch on
+  // MindmapNode.tsx (out of scope for the initial collab landing).
+  void isCollaborative;
 
   // Register imperative API for AI tools
   useEffect(() => {

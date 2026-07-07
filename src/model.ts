@@ -503,6 +503,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         collapsedNodeIds: new Set(),
         undoStack: [],
         redoStack: [],
+        // File-lineage state: never forwardable to a collab doc. Any state
+        // loaded from disk predates the room's snapshots by definition, so a
+        // current epoch here would let it diff-delete newer shared content.
+        collabEpoch: 0,
       };
 
     case 'SET_SELECTED':
@@ -633,12 +637,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
 
     case 'REPLACE_DOCUMENT': {
-      const prev = pushUndo(state);
+      // Remote snapshot (collab). Clear BOTH history stacks: undoing past a
+      // remote snapshot restores a stale document (often the initial default)
+      // whose collabEpoch is still current, so the forwarding effect would
+      // diff it against the newer baseline and mass-delete the room content
+      // (NIM-1521 undo hole). Collab undo belongs to Y.UndoManager later;
+      // reducer undo stays local-mode only.
       return {
-        ...prev,
+        ...state,
         document: action.document,
         selectedNodeId: action.document.rootId,
         editingNodeId: null,
+        undoStack: [],
+        redoStack: [],
+        collabEpoch: action.collabEpoch ?? state.collabEpoch,
       };
     }
 
@@ -690,5 +702,6 @@ export function createInitialState(doc: MindmapDocument): EditorState {
     collapsedNodeIds: new Set(),
     undoStack: [],
     redoStack: [],
+    collabEpoch: 0,
   };
 }

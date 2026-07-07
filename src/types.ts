@@ -66,6 +66,16 @@ export interface EditorState {
   collapsedNodeIds: Set<string>;
   undoStack: MindmapDocument[];
   redoStack: MindmapDocument[];
+  /**
+   * Collab lineage marker: the binding epoch of the last remote snapshot this
+   * state absorbed (via REPLACE_DOCUMENT). The forwarding effect only pushes
+   * `document` into the shared Y.Doc when this matches the binding's current
+   * epoch — a state derived from an older snapshot (e.g. the initial default
+   * document plus an auto-layout commit) must never be diffed against a newer
+   * baseline, or the diff mass-deletes the newer content for every client.
+   * Stays 0 (and unused) in local-only mode.
+   */
+  collabEpoch: number;
 }
 
 // Action types for the reducer
@@ -79,7 +89,7 @@ export type EditorAction =
   | { type: 'DELETE_NODE'; nodeId: string }
   | { type: 'MOVE_NODE'; nodeId: string; newParentId: string; index?: number }
   | { type: 'REORDER_CHILDREN'; parentId: string; childIds: string[] }
-  | { type: 'REPLACE_DOCUMENT'; document: MindmapDocument }
+  | { type: 'REPLACE_DOCUMENT'; document: MindmapDocument; collabEpoch?: number }
   | { type: 'UPDATE_POSITIONS'; positions: Record<string, { x: number; y: number }> }
   | { type: 'UNDO' }
   | { type: 'REDO' };
