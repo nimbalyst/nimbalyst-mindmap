@@ -13,6 +13,8 @@
  *   │       posY:     number
  *   │       childIds: Y.Array<string>
  *   │       tags:     Y.Array<string>
+ *   │       link:     string
+ *   │       pinned:   boolean
  *   └── meta: Y.Map { title: string; rootId: string }
  *
  * Why this shape:
@@ -52,6 +54,7 @@ export const Y_META = 'meta';
 
 export const META_TITLE = 'title';
 export const META_ROOT_ID = 'rootId';
+export const META_LAYOUT = 'layout';
 
 export const NODE_TEXT = 'text';
 export const NODE_NOTE = 'note';
@@ -62,6 +65,8 @@ export const NODE_POS_X = 'posX';
 export const NODE_POS_Y = 'posY';
 export const NODE_CHILD_IDS = 'childIds';
 export const NODE_TAGS = 'tags';
+export const NODE_LINK = 'link';
+export const NODE_PINNED = 'pinned';
 
 export interface YNodeView {
   // Convenience accessors live in helpers below; this type just documents
@@ -75,6 +80,8 @@ export interface YNodeView {
   posY: number;
   childIds: Y.Array<string>;
   tags: Y.Array<string>;
+  link: string;
+  pinned: boolean;
 }
 
 export function getYNodes(yDoc: Y.Doc): Y.Map<Y.Map<unknown>> {
@@ -95,6 +102,8 @@ export function createYNode(node: MindmapNode): Y.Map<unknown> {
   yNode.set(NODE_STATUS, node.status);
   yNode.set(NODE_POS_X, node.position.x);
   yNode.set(NODE_POS_Y, node.position.y);
+  yNode.set(NODE_LINK, node.link);
+  yNode.set(NODE_PINNED, node.pinned);
 
   const yChildIds = new Y.Array<string>();
   if (node.childIds.length > 0) yChildIds.push(node.childIds.slice());
@@ -124,6 +133,8 @@ export function readYNode(id: string, yNode: Y.Map<unknown>): MindmapNode {
     },
     childIds: childIdsArr ? childIdsArr.toArray() : [],
     tags: tagsArr ? tagsArr.toArray() : [],
+    link: String(yNode.get(NODE_LINK) ?? ''),
+    pinned: Boolean(yNode.get(NODE_PINNED) ?? false),
   };
 }
 
@@ -138,6 +149,8 @@ export function readYDoc(yDoc: Y.Doc): MindmapDocument {
   }
   const rootId = (yMeta.get(META_ROOT_ID) as string | undefined) ?? 'node_root';
   const title = (yMeta.get(META_TITLE) as string | undefined) ?? 'Untitled map';
+  const rawLayout = yMeta.get(META_LAYOUT);
+  const layout = rawLayout === 'right' ? 'right' : 'balanced';
   const now = new Date().toISOString();
   return {
     version: 1,
@@ -145,6 +158,7 @@ export function readYDoc(yDoc: Y.Doc): MindmapDocument {
     rootId,
     nodes,
     metadata: {
+      layout,
       createdAt: now,
       updatedAt: now,
       canvas: { viewport: { x: 0, y: 0, zoom: 1 } },

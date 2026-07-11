@@ -79,7 +79,7 @@ describe('EditOverlay', () => {
 
     // Commit with Enter
     fireEvent.keyDown(overlay, { key: 'Enter' });
-    expect(onCommit).toHaveBeenCalledWith('n1', 'abc');
+    expect(onCommit).toHaveBeenCalledWith('n1', 'abc', 'sibling');
   });
 
   it('cancels on Escape without committing', () => {
@@ -122,7 +122,47 @@ describe('EditOverlay', () => {
     const overlay = container.querySelector('.edit-overlay') as HTMLElement;
     overlay.textContent = 'Updated';
     fireEvent.blur(overlay);
-    expect(onCommit).toHaveBeenCalledWith('n1', 'Updated');
+    expect(onCommit).toHaveBeenCalledWith('n1', 'Updated', 'done');
+  });
+
+  it('uses Tab to commit and continue with a child', () => {
+    const onCommit = vi.fn();
+    const { container } = render(
+      <EditOverlay
+        editing={{
+          nodeId: 'n1',
+          text: 'Draft',
+          rect: { x: 0, y: 0, width: 120, height: 40 },
+          initialKey: null,
+          isRoot: false,
+        }}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+      />,
+    );
+    const overlay = container.querySelector('.edit-overlay') as HTMLElement;
+    overlay.textContent = 'Branch';
+    fireEvent.keyDown(overlay, { key: 'Tab' });
+    expect(onCommit).toHaveBeenCalledWith('n1', 'Branch', 'child');
+  });
+
+  it('allows Shift+Enter to insert multiline content without committing', () => {
+    const onCommit = vi.fn();
+    const { container } = render(
+      <EditOverlay
+        editing={{
+          nodeId: 'n1',
+          text: 'Draft',
+          rect: { x: 0, y: 0, width: 120, height: 40 },
+          initialKey: null,
+          isRoot: false,
+        }}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.keyDown(container.querySelector('.edit-overlay') as HTMLElement, { key: 'Enter', shiftKey: true });
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   it('does not get affected by parent re-renders during editing', () => {
@@ -169,6 +209,6 @@ describe('EditOverlay', () => {
 
     // Commit should still work
     fireEvent.keyDown(overlay, { key: 'Enter' });
-    expect(onCommit).toHaveBeenCalledWith('n1', 'xyz');
+    expect(onCommit).toHaveBeenCalledWith('n1', 'xyz', 'sibling');
   });
 });

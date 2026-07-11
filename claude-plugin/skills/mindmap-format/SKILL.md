@@ -43,6 +43,9 @@ Supported keys:
 - `color`: default, red, orange, yellow, green, blue, purple, pink
 - `status`: none, idea, question, todo, in-progress, done
 - `tags`: comma-separated list
+- `link`: related URL, workspace path, or artifact reference
+- `pinned`: `true` when a manual canvas position should survive hybrid layout
+- `x`, `y`: pinned canvas coordinates (written automatically by the editor)
 
 ### Frontmatter
 
@@ -59,6 +62,7 @@ title: My Mindmap
 ```markdown
 ---
 title: Project Plan
+layout: balanced
 ---
 
 # Project Plan
@@ -98,3 +102,4 @@ title: Project Plan
 5. Notes `> ...` go on the line(s) immediately after the node they belong to
 6. Blank lines between sections improve readability but are optional
 7. The file extension is `.mindmap` (not `.md`)
+8. Frontmatter `layout` may be `balanced` or `right`

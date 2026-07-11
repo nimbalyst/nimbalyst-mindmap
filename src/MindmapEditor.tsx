@@ -9,7 +9,7 @@ import {
   type Edge,
   type NodeChange,
   type OnNodesChange,
-  type NodeDragHandler,
+  type OnNodeDrag,
   BackgroundVariant,
 } from '@xyflow/react';
 import {
@@ -17,7 +17,7 @@ import {
   useCollaborativeEditor,
   type EditorHostProps,
 } from '@nimbalyst/extension-sdk';
-import type { MindmapNode, MindmapEditorAPI, EditorAction } from './types';
+import type { MindmapNode, MindmapEditorAPI, EditorAction, MindmapOperation } from './types';
 import {
   parseDocument,
   serializeDocument,
@@ -27,6 +27,8 @@ import {
   computeLayout,
   generateNodeId,
   estimateNodeWidth,
+  estimateNodeHeight,
+  applyMindmapOperations,
 } from './model';
 import { MindmapNodeComponent, type MindmapNodeData } from './MindmapNode';
 import { MindmapEdge } from './MindmapEdge';
@@ -46,11 +48,14 @@ function MindmapCanvas({
 }: EditorHostProps) {
   const [state, dispatch] = useReducer(editorReducer, createInitialState(createEmptyDocument()));
   const [showOutline, setShowOutline] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [needsLayout, setNeedsLayout] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter, getZoom } = useReactFlow();
   const pendingFitViewRef = useRef(false);
   const reactFlowReadyRef = useRef(false);
+  const fitRequestRef = useRef(0);
 
   // Use the SDK lifecycle hook for load/save/dirty/echo detection
   const stateRef = useRef(state);
@@ -67,12 +72,14 @@ function MindmapCanvas({
       // shared room (the "shows content for a moment, then empty" clobber).
       if (host.collaboration) return;
       dispatch({ type: 'LOAD_DOCUMENT', document: doc });
+      pendingFitViewRef.current = true;
       setNeedsLayout(true);
     },
     getCurrentContent: () => stateRef.current.document,
     parse: parseDocument,
     serialize: serializeDocument,
     onExternalChange: () => {
+      pendingFitViewRef.current = true;
       setNeedsLayout(true);
     },
   });
@@ -85,7 +92,7 @@ function MindmapCanvas({
   // the editor (awareness fields, local-document forwarding) can read it.
   const bindingRef = useRef<MindmapBinding | null>(null);
   // Bump on every remote state change so a re-render picks up the badges.
-  const [, forceRender] = useReducer((x) => x + 1, 0);
+  const [awarenessRevision, forceRender] = useReducer((x) => x + 1, 0);
   const { isCollaborative } = useCollaborativeEditor(host, {
     // Delegate emptiness + seeding to the single pure codec so the live seed
     // and the host's headless seed are provably the same code.
@@ -102,6 +109,7 @@ function MindmapCanvas({
         {
           onRemoteDocument: (doc, epoch) => {
             dispatch({ type: 'REPLACE_DOCUMENT', document: doc, collabEpoch: epoch });
+            if (!reactFlowReadyRef.current) pendingFitViewRef.current = true;
             setNeedsLayout(true);
           },
           onRemoteAwareness: () => forceRender(),
@@ -145,6 +153,35 @@ function MindmapCanvas({
     });
   }, [state.selectedNodeId, state.editingNodeId]);
 
+  // Make the current branch first-class chat context. This surfaces a context
+  // chip in Nimbalyst and lets ordinary prompts such as "expand this branch"
+  // resolve without the user copying node ids.
+  useEffect(() => {
+    const nodeId = state.selectedNodeId;
+    const node = nodeId ? state.document.nodes[nodeId] : undefined;
+    if (!node) {
+      host.setEditorContext(null);
+      return;
+    }
+    const path: string[] = [];
+    let current: MindmapNode | undefined = node;
+    while (current) {
+      path.unshift(current.text);
+      current = current.parentId ? state.document.nodes[current.parentId] : undefined;
+    }
+    host.setEditorContext({
+      label: `Mindmap: ${node.text || 'Untitled'}`,
+      description: [
+        `Selected mindmap node id: ${node.id}.`,
+        `Path: ${path.join(' > ')}.`,
+        `It has ${node.childIds.length} direct children.`,
+        node.note ? `Note: ${node.note}` : '',
+        'Use mindmap.get_context for the branch and mindmap.apply_operations for atomic edits.',
+      ].filter(Boolean).join(' '),
+    });
+    return () => host.setEditorContext(null);
+  }, [host, state.selectedNodeId, state.document.nodes]);
+
   // Future: pipe `bindingRef.current?.getRemoteEditingByUser()` into the
   // node renderer to draw "X is editing this node" badges. The awareness
   // wire is in place; the UI integration belongs to a follow-up touch on
@@ -155,6 +192,30 @@ function MindmapCanvas({
   useEffect(() => {
     const api: MindmapEditorAPI = {
       getDocument: () => stateRef.current.document,
+      getContext: (requestedNodeId, depth = 3) => {
+        const current = stateRef.current;
+        const nodeId = requestedNodeId ?? current.selectedNodeId ?? current.document.rootId;
+        const node = current.document.nodes[nodeId];
+        if (!node) throw new Error(`Node ${nodeId} not found`);
+        const path: Array<{ id: string; text: string }> = [];
+        let pathNode: MindmapNode | undefined = node;
+        while (pathNode) {
+          path.unshift({ id: pathNode.id, text: pathNode.text });
+          pathNode = pathNode.parentId ? current.document.nodes[pathNode.parentId] : undefined;
+        }
+        const subtree: MindmapNode[] = [];
+        const queue: Array<{ id: string; depth: number }> = [{ id: nodeId, depth: 0 }];
+        while (queue.length > 0) {
+          const item = queue.shift()!;
+          const child = current.document.nodes[item.id];
+          if (!child) continue;
+          subtree.push(child);
+          if (item.depth < Math.max(0, Math.min(depth, 10))) {
+            queue.push(...child.childIds.map((id) => ({ id, depth: item.depth + 1 })));
+          }
+        }
+        return { selectedNodeId: current.selectedNodeId, rootId: current.document.rootId, node, path, subtree };
+      },
       addNode: (parentId, text, options) => {
         const parent = stateRef.current.document.nodes[parentId];
         if (!parent) throw new Error(`Parent node ${parentId} not found`);
@@ -169,6 +230,8 @@ function MindmapCanvas({
           tags: options?.tags ?? [],
           status: options?.status ?? 'none',
           color: options?.color ?? 'default',
+          link: options?.link ?? '',
+          pinned: false,
         };
         dispatch({ type: 'CREATE_NODE', parentId, node: newNode, index: options?.index });
         setNeedsLayout(true);
@@ -193,6 +256,13 @@ function MindmapCanvas({
         setNeedsLayout(true);
         markDirty();
       },
+      applyOperations: (operations: MindmapOperation[]) => {
+        const result = applyMindmapOperations(stateRef.current.document, operations);
+        dispatch({ type: 'APPLY_DOCUMENT', document: result.document });
+        setNeedsLayout(true);
+        markDirty();
+        return { createdNodeIds: result.createdNodeIds, operationCount: operations.length };
+      },
     };
     host.registerEditorAPI(api);
     return () => host.registerEditorAPI(null);
@@ -202,6 +272,7 @@ function MindmapCanvas({
   useEffect(() => {
     if (diffState) {
       dispatch({ type: 'LOAD_DOCUMENT', document: diffState.modified });
+      pendingFitViewRef.current = true;
       setNeedsLayout(true);
     }
   }, [diffState]);
@@ -211,8 +282,12 @@ function MindmapCanvas({
     reactFlowReadyRef.current = true;
     if (pendingFitViewRef.current) {
       pendingFitViewRef.current = false;
-      // Small delay to let positioned nodes render
-      setTimeout(() => fitView({ padding: 0.2, duration: 0 }), 50);
+      const request = ++fitRequestRef.current;
+      // Wait for the layout dispatch and two browser paints. Unlike the old
+      // effect cleanup, this is not cancelled by the position state update.
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (request === fitRequestRef.current) fitView({ padding: 0.22, duration: 0 });
+      })), 60);
     }
   }, [fitView]);
 
@@ -222,15 +297,21 @@ function MindmapCanvas({
     setNeedsLayout(false);
 
     const layout = computeLayout(state.document, state.collapsedNodeIds);
-    dispatch({ type: 'UPDATE_POSITIONS', positions: layout.positions });
+    const positions = { ...layout.positions };
+    for (const node of Object.values(state.document.nodes)) {
+      if (node.pinned) positions[node.id] = node.position;
+    }
+    dispatch({ type: 'UPDATE_POSITIONS', positions });
 
     if (!reactFlowReadyRef.current) {
       // React Flow hasn't initialized yet -- defer fitView until onInit fires
       pendingFitViewRef.current = true;
-    } else {
-      // React Flow is ready, fit after a short render delay
-      const timer = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
-      return () => clearTimeout(timer);
+    } else if (pendingFitViewRef.current) {
+      pendingFitViewRef.current = false;
+      const request = ++fitRequestRef.current;
+      setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (request === fitRequestRef.current) fitView({ padding: 0.22, duration: 220 });
+      })), 60);
     }
   }, [needsLayout, state.document, state.collapsedNodeIds, fitView]);
 
@@ -243,6 +324,9 @@ function MindmapCanvas({
     isRoot: boolean;
   } | null>(null);
   const isEditingRef = useRef(false);
+  const createChildRef = useRef<(nodeId: string) => void>(() => undefined);
+  const createSiblingRef = useRef<(nodeId: string, before?: boolean) => void>(() => undefined);
+  const navigateNodeRef = useRef<(key: string, node: MindmapNode, doc: typeof state.document) => void>(() => undefined);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
   const startEditing = useCallback(
@@ -258,6 +342,7 @@ function MindmapCanvas({
       if (!node) return;
 
       isEditingRef.current = true;
+      dispatch({ type: 'SET_EDITING', nodeId });
       setEditOverlay({
         nodeId,
         text: node.text,
@@ -271,26 +356,41 @@ function MindmapCanvas({
         isRoot: nodeId === state.document.rootId,
       });
     },
-    [state.document]
+    [state.document, dispatch]
   );
 
   const handleEditCommit = useCallback(
-    (nodeId: string, text: string) => {
+    (nodeId: string, text: string, intent: 'done' | 'sibling' | 'child') => {
       dispatch({ type: 'UPDATE_NODE', nodeId, updates: { text } });
+      dispatch({ type: 'SET_EDITING', nodeId: null });
       markDirty();
       isEditingRef.current = false;
       setEditOverlay(null);
+      if (intent !== 'done') {
+        setTimeout(() => {
+          if (intent === 'child') createChildRef.current(nodeId);
+          else createSiblingRef.current(nodeId);
+        }, 0);
+      }
     },
     [dispatch, markDirty]
   );
 
   const handleEditCancel = useCallback(() => {
+    const nodeId = editOverlay?.nodeId;
+    const node = nodeId ? stateRef.current.document.nodes[nodeId] : undefined;
+    if (node && !node.text && node.id !== stateRef.current.document.rootId) {
+      dispatch({ type: 'DELETE_NODE', nodeId: node.id });
+      setNeedsLayout(true);
+      markDirty();
+    }
+    dispatch({ type: 'SET_EDITING', nodeId: null });
     isEditingRef.current = false;
     setEditOverlay(null);
-  }, []);
+  }, [editOverlay, dispatch, markDirty]);
 
   const handleStartEditing = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, before = false) => {
       startEditing(nodeId, null);
     },
     [startEditing]
@@ -314,7 +414,7 @@ function MindmapCanvas({
   // Create child node
   const createChild = useCallback(
     (parentId: string) => {
-      const parent = state.document.nodes[parentId];
+      const parent = stateRef.current.document.nodes[parentId];
       if (!parent) return;
       const newId = generateNodeId();
       const newNode: MindmapNode = {
@@ -327,22 +427,24 @@ function MindmapCanvas({
         tags: [],
         status: 'none',
         color: 'default',
+        link: '',
+        pinned: false,
       };
       dispatch({ type: 'CREATE_NODE', parentId, node: newNode });
       setNeedsLayout(true);
       markDirty();
     },
-    [state.document.nodes, dispatch, markDirty]
+    [dispatch, markDirty]
   );
 
   // Create sibling node
   const createSibling = useCallback(
-    (nodeId: string) => {
-      const node = state.document.nodes[nodeId];
+    (nodeId: string, before = false) => {
+      const node = stateRef.current.document.nodes[nodeId];
       if (!node || !node.parentId) return;
-      const parent = state.document.nodes[node.parentId];
+      const parent = stateRef.current.document.nodes[node.parentId];
       if (!parent) return;
-      const index = parent.childIds.indexOf(nodeId) + 1;
+      const index = parent.childIds.indexOf(nodeId) + (before ? 0 : 1);
       const newId = generateNodeId();
       const newNode: MindmapNode = {
         id: newId,
@@ -354,13 +456,70 @@ function MindmapCanvas({
         tags: [],
         status: 'none',
         color: 'default',
+        link: '',
+        pinned: false,
       };
       dispatch({ type: 'CREATE_NODE', parentId: node.parentId, node: newNode, index });
       setNeedsLayout(true);
       markDirty();
     },
-    [state.document.nodes, dispatch, markDirty]
+    [dispatch, markDirty]
   );
+  createChildRef.current = createChild;
+  createSiblingRef.current = createSibling;
+
+  const moveAmongSiblings = useCallback((nodeId: string, delta: number) => {
+    const doc = stateRef.current.document;
+    const node = doc.nodes[nodeId];
+    if (!node?.parentId) return;
+    const parent = doc.nodes[node.parentId];
+    if (!parent) return;
+    const index = parent.childIds.indexOf(nodeId);
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= parent.childIds.length) return;
+    const childIds = [...parent.childIds];
+    [childIds[index], childIds[target]] = [childIds[target], childIds[index]];
+    dispatch({ type: 'REORDER_CHILDREN', parentId: parent.id, childIds });
+    setNeedsLayout(true);
+    markDirty();
+  }, [dispatch, markDirty]);
+
+  const indentNode = useCallback((nodeId: string) => {
+    const doc = stateRef.current.document;
+    const node = doc.nodes[nodeId];
+    if (!node?.parentId) return;
+    const parent = doc.nodes[node.parentId];
+    const index = parent?.childIds.indexOf(nodeId) ?? -1;
+    if (!parent || index <= 0) return;
+    dispatch({ type: 'MOVE_NODE', nodeId, newParentId: parent.childIds[index - 1] });
+    setNeedsLayout(true);
+    markDirty();
+  }, [dispatch, markDirty]);
+
+  const outdentNode = useCallback((nodeId: string) => {
+    const doc = stateRef.current.document;
+    const node = doc.nodes[nodeId];
+    const parent = node?.parentId ? doc.nodes[node.parentId] : undefined;
+    if (!node || !parent?.parentId) return;
+    const grandparent = doc.nodes[parent.parentId];
+    if (!grandparent) return;
+    dispatch({
+      type: 'MOVE_NODE',
+      nodeId,
+      newParentId: grandparent.id,
+      index: grandparent.childIds.indexOf(parent.id) + 1,
+    });
+    setNeedsLayout(true);
+    markDirty();
+  }, [dispatch, markDirty]);
+
+  // CREATE_NODE records the editing target before its DOM exists. Open the
+  // overlay after layout/render so keyboard-created nodes are immediately writable.
+  useEffect(() => {
+    if (!state.editingNodeId || editOverlay) return;
+    const timer = setTimeout(() => startEditing(state.editingNodeId!), 60);
+    return () => clearTimeout(timer);
+  }, [state.editingNodeId, state.document.nodes, editOverlay, startEditing]);
 
   // Keyboard shortcuts (scoped to mindmap editor only)
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -376,6 +535,17 @@ function MindmapCanvas({
       if (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable) return;
       // Use ref for always-current editing state (avoids stale closure)
       if (isEditingRef.current) return;
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts(true);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        fitView({ padding: 0.2, duration: 250 });
+        return;
+      }
 
       const { selectedNodeId } = state;
       if (!selectedNodeId) return;
@@ -395,7 +565,7 @@ function MindmapCanvas({
           case 'ArrowLeft':
           case 'ArrowRight':
             e.preventDefault();
-            navigateNode(e.key, selectedNode, state.document);
+            navigateNodeRef.current(e.key, selectedNode, state.document);
             break;
           case 'Escape':
             dispatch({ type: 'SET_SELECTED', nodeId: state.document.rootId });
@@ -407,13 +577,15 @@ function MindmapCanvas({
       switch (e.key) {
         case 'Tab': {
           e.preventDefault();
-          createChild(selectedNodeId);
+          if (e.shiftKey) outdentNode(selectedNodeId);
+          else if (e.altKey) indentNode(selectedNodeId);
+          else createChild(selectedNodeId);
           break;
         }
         case 'Enter': {
           e.preventDefault();
           if (selectedNode.parentId) {
-            createSibling(selectedNodeId);
+            createSibling(selectedNodeId, e.shiftKey);
           } else {
             createChild(selectedNodeId);
           }
@@ -440,6 +612,13 @@ function MindmapCanvas({
           setNeedsLayout(true);
           break;
         }
+        case '.': {
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault();
+            setFocusNodeId((current) => current ? null : selectedNodeId);
+          }
+          break;
+        }
         case 'z': {
           if (e.metaKey || e.ctrlKey) {
             e.preventDefault();
@@ -458,11 +637,16 @@ function MindmapCanvas({
         case 'ArrowLeft':
         case 'ArrowRight': {
           e.preventDefault();
-          navigateNode(e.key, selectedNode, state.document);
+          if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            moveAmongSiblings(selectedNodeId, e.key === 'ArrowUp' ? -1 : 1);
+          } else {
+            navigateNodeRef.current(e.key, selectedNode, state.document);
+          }
           break;
         }
         case 'Escape': {
-          dispatch({ type: 'SET_SELECTED', nodeId: state.document.rootId });
+          if (focusNodeId) setFocusNodeId(null);
+          else dispatch({ type: 'SET_SELECTED', nodeId: state.document.rootId });
           break;
         }
         default: {
@@ -483,52 +667,68 @@ function MindmapCanvas({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [state, readOnly, createChild, createSibling, dispatch, startEditing, markDirty]);
+  }, [state, readOnly, createChild, createSibling, dispatch, startEditing, markDirty, moveAmongSiblings, indentNode, outdentNode, fitView, focusNodeId]);
 
   // Arrow key navigation
   const navigateNode = useCallback(
     (key: string, node: MindmapNode, doc: typeof state.document) => {
-      switch (key) {
-        case 'ArrowLeft': {
-          if (node.parentId) {
-            dispatch({ type: 'SET_SELECTED', nodeId: node.parentId });
-          }
-          break;
+      const direction = key === 'ArrowLeft'
+        ? { x: -1, y: 0 }
+        : key === 'ArrowRight'
+          ? { x: 1, y: 0 }
+          : key === 'ArrowUp'
+            ? { x: 0, y: -1 }
+            : { x: 0, y: 1 };
+      const isVisible = (candidate: MindmapNode): boolean => {
+        let current: MindmapNode | undefined = candidate;
+        let insideFocus = focusNodeId === null;
+        while (current) {
+          if (current.id === focusNodeId) insideFocus = true;
+          if (current.id !== candidate.id && state.collapsedNodeIds.has(current.id)) return false;
+          current = current.parentId ? doc.nodes[current.parentId] : undefined;
         }
-        case 'ArrowRight': {
-          if (node.childIds.length > 0) {
-            dispatch({ type: 'SET_SELECTED', nodeId: node.childIds[0] });
-          }
-          break;
-        }
-        case 'ArrowUp':
-        case 'ArrowDown': {
-          if (!node.parentId) break;
-          const parent = doc.nodes[node.parentId];
-          if (!parent) break;
-          const idx = parent.childIds.indexOf(node.id);
-          const nextIdx = key === 'ArrowUp' ? idx - 1 : idx + 1;
-          if (nextIdx >= 0 && nextIdx < parent.childIds.length) {
-            dispatch({ type: 'SET_SELECTED', nodeId: parent.childIds[nextIdx] });
-          }
-          break;
-        }
+        return insideFocus;
+      };
+      let best: { candidate: MindmapNode; score: number } | null = null;
+      for (const candidate of Object.values(doc.nodes)) {
+        if (candidate.id === node.id || !isVisible(candidate)) continue;
+        const dx = candidate.position.x - node.position.x;
+        const dy = candidate.position.y - node.position.y;
+        const forward = dx * direction.x + dy * direction.y;
+        if (forward <= 4) continue;
+        const perpendicular = Math.abs(dx * direction.y - dy * direction.x);
+        const score = Math.hypot(dx, dy) + perpendicular * 1.5;
+        if (!best || score < best.score) best = { candidate, score };
+      }
+      if (best) {
+        dispatch({ type: 'SET_SELECTED', nodeId: best.candidate.id });
+        setCenter(
+          best.candidate.position.x + estimateNodeWidth(best.candidate, best.candidate.id === doc.rootId) / 2,
+          best.candidate.position.y + 28,
+          { zoom: getZoom(), duration: 180 },
+        );
       }
     },
-    [dispatch]
+    [dispatch, focusNodeId, state.collapsedNodeIds, setCenter, getZoom]
   );
+  navigateNodeRef.current = navigateNode;
 
   // Convert graph model to React Flow nodes and edges
   const { nodes, edges } = useMemo(() => {
     const rfNodes: Node[] = [];
     const rfEdges: Edge[] = [];
     const { document: doc, collapsedNodeIds, selectedNodeId } = state;
+    const remoteEditorsByNode = new Map<string, string[]>();
+    for (const [userId, nodeId] of bindingRef.current?.getRemoteEditingByUser() ?? []) {
+      if (!nodeId) continue;
+      remoteEditorsByNode.set(nodeId, [...(remoteEditorsByNode.get(nodeId) ?? []), userId]);
+    }
 
     // Determine which root children are on the left side
     const rootNode = doc.nodes[doc.rootId];
     const rootChildren = rootNode ? rootNode.childIds.filter((id) => doc.nodes[id]) : [];
     const midpoint = Math.ceil(rootChildren.length / 2);
-    const leftChildIds = new Set(rootChildren.slice(midpoint));
+    const leftChildIds = new Set(state.document.metadata.layout === 'balanced' ? rootChildren.slice(midpoint) : []);
 
     // Determine if a node is on the left side (descended from a left root child)
     function isOnLeftSide(nodeId: string): boolean {
@@ -545,7 +745,7 @@ function MindmapCanvas({
 
     // BFS to build visible nodes
     const visited = new Set<string>();
-    const queue: string[] = [doc.rootId];
+    const queue: string[] = [focusNodeId && doc.nodes[focusNodeId] ? focusNodeId : doc.rootId];
 
     while (queue.length > 0) {
       const nodeId = queue.shift()!;
@@ -568,6 +768,7 @@ function MindmapCanvas({
         isCollapsed,
         isLeftSide: leftSide,
         childCount: node.childIds.length,
+        remoteEditors: remoteEditorsByNode.get(nodeId) ?? [],
         onStartEditing: readOnly ? undefined : handleStartEditing,
         onToggleCollapse: handleToggleCollapse,
         onSelect: handleSelect,
@@ -577,13 +778,14 @@ function MindmapCanvas({
         id: nodeId,
         type: 'mindmap',
         position: node.position,
-        data: nodeData as Record<string, unknown>,
+        data: nodeData as unknown as Record<string, unknown>,
         selected: nodeId === selectedNodeId,
         // Explicit dimensions for MiniMap (getBoundingClientRect returns 0 in extension host)
         measured: {
           width: estimateNodeWidth(node, nodeId === doc.rootId),
-          height: node.tags.length > 0 ? 68 : 48,
+          height: estimateNodeHeight(node),
         },
+        style: { width: estimateNodeWidth(node, nodeId === doc.rootId) },
       });
 
       for (const childId of visibleChildIds) {
@@ -602,6 +804,8 @@ function MindmapCanvas({
     return { nodes: rfNodes, edges: rfEdges };
   }, [
     state,
+    focusNodeId,
+    awarenessRevision,
     handleStartEditing,
     handleToggleCollapse,
     handleSelect,
@@ -620,7 +824,7 @@ function MindmapCanvas({
         }
       }
       if (Object.keys(positionChanges).length > 0) {
-        dispatch({ type: 'UPDATE_POSITIONS', positions: positionChanges });
+        dispatch({ type: 'UPDATE_POSITIONS', positions: positionChanges, pin: true });
         markDirty();
       }
     },
@@ -629,7 +833,7 @@ function MindmapCanvas({
 
   // Drag-to-reparent: when a node is dropped, check if it overlaps another node
   const REPARENT_DISTANCE = 120;
-  const onNodeDragStop: NodeDragHandler = useCallback(
+  const onNodeDragStop: OnNodeDrag = useCallback(
     (_event, draggedNode) => {
       const draggedId = draggedNode.id;
       if (draggedId === state.document.rootId) return;
@@ -673,6 +877,7 @@ function MindmapCanvas({
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [searchIndex, setSearchIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Search results
@@ -686,6 +891,23 @@ function MindmapCanvas({
         n.tags.some((t) => t.toLowerCase().includes(q))
     );
   }, [searchQuery, state.document.nodes]);
+
+  useEffect(() => setSearchIndex(-1), [searchQuery]);
+
+  const selectSearchResult = useCallback((index: number) => {
+    if (searchResults.length === 0) return;
+    const normalized = (index + searchResults.length) % searchResults.length;
+    const result = searchResults[normalized];
+    setSearchIndex(normalized);
+    setFocusNodeId(null);
+    dispatch({ type: 'EXPAND_PATH', nodeId: result.id });
+    dispatch({ type: 'SET_SELECTED', nodeId: result.id });
+    setCenter(
+      result.position.x + estimateNodeWidth(result, result.id === state.document.rootId) / 2,
+      result.position.y + 28,
+      { zoom: Math.max(getZoom(), 0.8), duration: 250 },
+    );
+  }, [searchResults, dispatch, setCenter, getZoom, state.document.rootId]);
 
   // Focus search on Ctrl+F (scoped to mindmap editor)
   useEffect(() => {
@@ -711,8 +933,17 @@ function MindmapCanvas({
 
   // Auto-layout button
   const handleAutoLayout = useCallback(() => {
+    const nodes = Object.fromEntries(
+      Object.entries(stateRef.current.document.nodes).map(([id, node]) => [id, { ...node, pinned: false }]),
+    );
+    dispatch({
+      type: 'APPLY_DOCUMENT',
+      document: { ...stateRef.current.document, nodes },
+    });
+    pendingFitViewRef.current = true;
     setNeedsLayout(true);
-  }, []);
+    markDirty();
+  }, [dispatch, markDirty]);
 
   // Selected node for inspector
   const selectedNode = state.selectedNodeId
@@ -753,20 +984,43 @@ function MindmapCanvas({
                     setSearchQuery('');
                   }
                   if (e.key === 'Enter' && searchResults.length > 0) {
-                    dispatch({ type: 'SET_SELECTED', nodeId: searchResults[0].id });
+                    e.preventDefault();
+                    selectSearchResult(searchIndex < 0 ? (e.shiftKey ? -1 : 0) : searchIndex + (e.shiftKey ? -1 : 1));
                   }
                 }}
                 placeholder="Search nodes..."
               />
               {searchQuery && (
                 <span className="mindmap-search-count">
-                  {searchResults.length} match{searchResults.length !== 1 ? 'es' : ''}
+                  {searchResults.length === 0 ? 'No matches' : `${Math.max(0, searchIndex + 1)}/${searchResults.length}`}
                 </span>
               )}
             </div>
           )}
         </div>
         <div className="mindmap-toolbar-actions">
+          {!readOnly && (
+            <select
+              className="mindmap-toolbar-select"
+              value={state.document.metadata.layout}
+              onChange={(event) => {
+                dispatch({
+                  type: 'APPLY_DOCUMENT',
+                  document: {
+                    ...state.document,
+                    metadata: { ...state.document.metadata, layout: event.target.value as 'balanced' | 'right' },
+                  },
+                });
+                pendingFitViewRef.current = true;
+                setNeedsLayout(true);
+                markDirty();
+              }}
+              title="Map layout"
+            >
+              <option value="balanced">Balanced</option>
+              <option value="right">Right logical</option>
+            </select>
+          )}
           <button
             className="mindmap-toolbar-btn"
             onClick={() => {
@@ -790,13 +1044,22 @@ function MindmapCanvas({
               {showOutline ? 'Hide Outline' : 'Outline'}
             </button>
           )}
+          {selectedNode && selectedNode.id !== state.document.rootId && (
+            <button
+              className={`mindmap-toolbar-btn ${focusNodeId ? 'active' : ''}`}
+              onClick={() => setFocusNodeId(focusNodeId ? null : selectedNode.id)}
+              title="Focus selected branch (Ctrl/Cmd+.)"
+            >
+              {focusNodeId ? 'Exit Focus' : 'Focus'}
+            </button>
+          )}
           {!readOnly && (
             <button
               className="mindmap-toolbar-btn"
               onClick={handleAutoLayout}
-              title="Auto-layout all nodes"
+              title="Tidy all nodes and clear manual position pins"
             >
-              Auto Layout
+              Tidy Map
             </button>
           )}
           <button
@@ -805,6 +1068,13 @@ function MindmapCanvas({
             title="Fit to view"
           >
             Fit View
+          </button>
+          <button
+            className="mindmap-toolbar-btn"
+            onClick={() => setShowShortcuts(true)}
+            title="Keyboard shortcuts (?)"
+          >
+            ?
           </button>
         </div>
       </div>
@@ -905,6 +1175,30 @@ function MindmapCanvas({
           <Inspector node={selectedNode} dispatch={dispatch} onDirty={markDirty} />
         )}
       </div>
+      {showShortcuts && (
+        <div className="mindmap-modal-backdrop" onMouseDown={() => setShowShortcuts(false)}>
+          <div className="mindmap-shortcuts" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Mindmap keyboard shortcuts">
+            <div className="mindmap-shortcuts-header">
+              <strong>Keyboard shortcuts</strong>
+              <button onClick={() => setShowShortcuts(false)} aria-label="Close">×</button>
+            </div>
+            <div className="mindmap-shortcuts-grid">
+              <kbd>Tab</kbd><span>Create child</span>
+              <kbd>Enter</kbd><span>Create sibling</span>
+              <kbd>Shift+Enter</kbd><span>Create sibling above</span>
+              <kbd>Shift+Tab</kbd><span>Outdent</span>
+              <kbd>Alt+Tab</kbd><span>Indent under previous sibling</span>
+              <kbd>Cmd/Ctrl+↑↓</kbd><span>Reorder siblings</span>
+              <kbd>Arrows</kbd><span>Navigate spatially</span>
+              <kbd>F2 / type</kbd><span>Edit title</span>
+              <kbd>Space</kbd><span>Collapse or expand</span>
+              <kbd>Cmd/Ctrl+F</kbd><span>Search</span>
+              <kbd>Cmd/Ctrl+.</kbd><span>Focus branch</span>
+              <kbd>Cmd/Ctrl+0</kbd><span>Fit map</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

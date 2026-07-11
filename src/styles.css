@@ -100,6 +100,15 @@
   gap: 4px;
 }
 
+.mindmap-toolbar-select {
+  padding: 4px 22px 4px 8px;
+  font-size: 11px;
+  color: var(--nim-text-muted);
+  background: var(--nim-bg-secondary);
+  border: 1px solid var(--nim-border);
+  border-radius: 4px;
+}
+
 .mindmap-toolbar-btn {
   padding: 4px 10px;
   font-size: 11px;
@@ -116,6 +125,12 @@
   background: var(--nim-bg-tertiary);
   color: var(--nim-text);
   border-color: var(--nim-text-faint);
+}
+
+.mindmap-toolbar-btn.active {
+  color: var(--nim-primary);
+  border-color: var(--nim-primary);
+  background: color-mix(in srgb, var(--nim-primary) 12%, transparent);
 }
 
 /* ==========================================
@@ -145,12 +160,15 @@
    ========================================== */
 
 .mindmap-node {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 14px;
   border-radius: 8px;
   border: 1.5px solid var(--nim-border);
   background: var(--nim-bg-secondary);
   min-width: 80px;
-  max-width: 260px;
+  max-width: none;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
@@ -199,6 +217,51 @@
 
 .mindmap-node-root .mindmap-node-text {
   font-size: 15px;
+}
+
+.mindmap-node-note {
+  margin-top: 5px;
+  color: var(--nim-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  user-select: text;
+}
+
+.mindmap-node-indicators {
+  position: absolute;
+  top: -8px;
+  right: -7px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--nim-text-faint);
+  font-size: 8px;
+}
+
+.mindmap-node-link,
+.mindmap-remote-editor {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nim-bg-tertiary);
+  border: 1px solid var(--nim-border);
+  color: var(--nim-text-muted);
+  text-decoration: none;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.mindmap-remote-editor {
+  background: var(--nim-primary);
+  color: white;
+  border-color: var(--nim-primary);
 }
 
 /* Edit overlay -- positioned over the node text, outside React Flow */
@@ -432,6 +495,15 @@
   color: var(--nim-text-faint);
 }
 
+.inspector-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--nim-text-muted);
+  cursor: pointer;
+}
+
 /* ==========================================
    Outline Panel
    ========================================== */
@@ -521,6 +593,24 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.outline-note-indicator {
+  color: var(--nim-primary);
+  letter-spacing: -1px;
+}
+
+.outline-edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  color: var(--nim-text);
+  background: var(--nim-bg);
+  border: 1px solid var(--nim-primary);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
 }
 
 .outline-count {
@@ -660,4 +750,65 @@
 .outline-item:focus {
   outline: 1px solid var(--nim-primary);
   outline-offset: -1px;
+}
+
+/* ==========================================
+   Shortcut help
+   ========================================== */
+
+.mindmap-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.mindmap-shortcuts {
+  width: min(460px, calc(100% - 40px));
+  max-height: calc(100% - 60px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--nim-border);
+  border-radius: 10px;
+  background: var(--nim-bg-secondary);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+
+.mindmap-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.mindmap-shortcuts-header button {
+  border: 0;
+  background: transparent;
+  color: var(--nim-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.mindmap-shortcuts-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 14px;
+  align-items: center;
+  color: var(--nim-text-muted);
+  font-size: 12px;
+}
+
+.mindmap-shortcuts-grid kbd {
+  justify-self: end;
+  padding: 2px 6px;
+  border: 1px solid var(--nim-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--nim-bg-tertiary);
+  color: var(--nim-text);
+  font: inherit;
+  font-size: 10px;
 }

@@ -1,6 +1,6 @@
 // Graph model: parsing, serialization, mutations, layout
 
-import type { MindmapDocument, MindmapNode, NodeStatus, NodeColor, EditorState, EditorAction } from './types';
+import type { MindmapDocument, MindmapNode, NodeStatus, NodeColor, EditorState, EditorAction, MindmapOperation, LayoutMode } from './types';
 
 // --- ID generation ---
 
@@ -29,9 +29,12 @@ export function createEmptyDocument(): MindmapDocument {
         tags: [],
         status: 'none',
         color: 'default',
+        link: '',
+        pinned: false,
       },
     },
     metadata: {
+      layout: 'balanced',
       createdAt: now,
       updatedAt: now,
       canvas: { viewport: { x: 0, y: 0, zoom: 1 } },
@@ -49,11 +52,15 @@ interface ParsedMeta {
   color: NodeColor;
   status: NodeStatus;
   tags: string[];
+  link: string;
+  pinned: boolean;
+  x?: number;
+  y?: number;
 }
 
 /** Parse trailing {key: value, ...} metadata from a line, returning cleaned text + metadata */
 export function parseInlineMetadata(raw: string): ParsedMeta {
-  const result: ParsedMeta = { text: raw, color: 'default', status: 'none', tags: [] };
+  const result: ParsedMeta = { text: raw, color: 'default', status: 'none', tags: [], link: '', pinned: false };
   const metaMatch = raw.match(/\{([^}]+)\}\s*$/);
   if (!metaMatch) return result;
 
@@ -64,7 +71,7 @@ export function parseInlineMetadata(raw: string): ParsedMeta {
   // e.g. "color: blue, status: todo, tags: frontend, urgent"
   // -> ["color: blue", "status: todo", "tags: frontend, urgent"]
   const keyValuePairs: { key: string; val: string }[] = [];
-  const keyPattern = /\b(color|status|tags)\s*:/g;
+  const keyPattern = /\b(color|status|tags|link|pinned|x|y)\s*:/g;
   let match: RegExpExecArray | null;
   const starts: { key: string; start: number }[] = [];
   while ((match = keyPattern.exec(metaStr)) !== null) {
@@ -91,6 +98,22 @@ export function parseInlineMetadata(raw: string): ParsedMeta {
       case 'tags':
         result.tags = val.split(',').map((t) => t.trim()).filter(Boolean);
         break;
+      case 'link':
+        result.link = val;
+        break;
+      case 'pinned':
+        result.pinned = val === 'true';
+        break;
+      case 'x': {
+        const x = Number(val);
+        if (Number.isFinite(x)) result.x = x;
+        break;
+      }
+      case 'y': {
+        const y = Number(val);
+        if (Number.isFinite(y)) result.y = y;
+        break;
+      }
     }
   }
   return result;
@@ -102,6 +125,12 @@ function formatInlineMetadata(node: MindmapNode): string {
   if (node.color !== 'default') parts.push(`color: ${node.color}`);
   if (node.status !== 'none') parts.push(`status: ${node.status}`);
   if (node.tags.length > 0) parts.push(`tags: ${node.tags.join(', ')}`);
+  if (node.link) parts.push(`link: ${node.link}`);
+  if (node.pinned) {
+    parts.push('pinned: true');
+    parts.push(`x: ${Math.round(node.position.x)}`);
+    parts.push(`y: ${Math.round(node.position.y)}`);
+  }
   return parts.length > 0 ? ` {${parts.join(', ')}}` : '';
 }
 
@@ -117,12 +146,15 @@ export function parseDocument(raw: string): MindmapDocument {
 
   // Parse optional YAML frontmatter
   let title = '';
+  let layout: LayoutMode = 'balanced';
   if (lines[0]?.trim() === '---') {
     lineIdx = 1;
     while (lineIdx < lines.length && lines[lineIdx].trim() !== '---') {
       const fmMatch = lines[lineIdx].match(/^(\w+):\s*(.*)/);
       if (fmMatch && fmMatch[1] === 'title') {
         title = fmMatch[2].trim();
+      } else if (fmMatch && fmMatch[1] === 'layout' && (fmMatch[2].trim() === 'balanced' || fmMatch[2].trim() === 'right')) {
+        layout = fmMatch[2].trim() as LayoutMode;
       }
       lineIdx++;
     }
@@ -154,10 +186,12 @@ export function parseDocument(raw: string): MindmapDocument {
       note: '',
       parentId,
       childIds: [],
-      position: { x: 0, y: 0 },
+      position: { x: meta.x ?? 0, y: meta.y ?? 0 },
       tags: meta.tags,
       status: meta.status,
       color: meta.color,
+      link: meta.link,
+      pinned: meta.pinned,
     };
 
     if (parentId && nodes[parentId]) {
@@ -228,6 +262,7 @@ export function parseDocument(raw: string): MindmapDocument {
     rootId,
     nodes,
     metadata: {
+      layout,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       canvas: { viewport: { x: 0, y: 0, zoom: 1 } },
@@ -243,6 +278,7 @@ export function serializeDocument(doc: MindmapDocument): string {
   // Frontmatter
   lines.push('---');
   lines.push(`title: ${doc.title}`);
+  lines.push(`layout: ${doc.metadata.layout}`);
   lines.push('---');
   lines.push('');
 
@@ -310,7 +346,7 @@ const NODE_HEIGHT = 48;
 const TAG_ROW_HEIGHT = 20;
 const H_SPACING = 70;
 const V_SPACING = 20;
-const MAX_NODE_WIDTH = 260;
+const MAX_NODE_WIDTH = 300;
 const CHAR_WIDTH = 7.5; // approximate px per character at 13px font
 const NODE_H_PADDING = 28; // 14px padding each side
 const STATUS_ICON_WIDTH = 22; // icon + gap
@@ -326,12 +362,18 @@ export function estimateNodeWidth(node: MindmapNode, isRoot: boolean): number {
     // Root has larger padding (22px each side) and larger font (~8.5px/char)
     width = 44 + text.length * 8.5;
   }
+  if (node.note) {
+    const notePreview = node.note.replace(/\s+/g, ' ').trim();
+    const notePadding = isRoot ? 44 : NODE_H_PADDING;
+    width = Math.max(width, notePadding + Math.min(notePreview.length, 42) * 6.2);
+  }
   return Math.max(80, Math.min(MAX_NODE_WIDTH, Math.round(width)));
 }
 
 /** Estimate the rendered height of a node (accounts for tag rows) */
-function estimateNodeHeight(node: MindmapNode): number {
-  return node.tags.length > 0 ? NODE_HEIGHT + TAG_ROW_HEIGHT : NODE_HEIGHT;
+export function estimateNodeHeight(node: MindmapNode): number {
+  const noteHeight = node.note ? 22 : 0;
+  return (node.tags.length > 0 ? NODE_HEIGHT + TAG_ROW_HEIGHT : NODE_HEIGHT) + noteHeight;
 }
 
 interface SubtreeSize {
@@ -415,6 +457,12 @@ export function computeLayout(
   if (!root) return { positions };
 
   const rootWidth = estimateNodeWidth(root, true);
+
+  if (doc.metadata.layout === 'right') {
+    const size = getSubtreeSize(doc.rootId, doc.nodes, collapsed, doc.rootId);
+    layoutSubtree(doc.rootId, 0, -size.height / 2, doc.nodes, collapsed, positions, 'right', doc.rootId);
+    return { positions };
+  }
 
   // Split children into left and right halves for balanced layout
   const children = root.childIds.filter((id) => doc.nodes[id]);
@@ -612,7 +660,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         newChildIds.push(action.nodeId);
       }
       nodes[action.newParentId] = { ...newParent, childIds: newChildIds };
-      nodes[action.nodeId] = { ...node, parentId: action.newParentId };
+      nodes[action.nodeId] = { ...node, parentId: action.newParentId, pinned: false };
 
       return {
         ...prev,
@@ -658,12 +706,40 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const nodes = { ...state.document.nodes };
       for (const [id, pos] of Object.entries(action.positions)) {
         if (nodes[id]) {
-          nodes[id] = { ...nodes[id], position: pos };
+          nodes[id] = { ...nodes[id], position: pos, ...(action.pin === undefined ? {} : { pinned: action.pin }) };
         }
       }
       return {
         ...state,
         document: { ...state.document, nodes },
+      };
+    }
+
+    case 'SET_ALL_PINNED': {
+      const nodes: Record<string, MindmapNode> = {};
+      for (const [id, node] of Object.entries(state.document.nodes)) {
+        nodes[id] = { ...node, pinned: action.pinned };
+      }
+      return { ...state, document: { ...state.document, nodes } };
+    }
+
+    case 'EXPAND_PATH': {
+      const collapsedNodeIds = new Set(state.collapsedNodeIds);
+      let current: string | null = action.nodeId;
+      while (current) {
+        collapsedNodeIds.delete(current);
+        current = state.document.nodes[current]?.parentId ?? null;
+      }
+      return { ...state, collapsedNodeIds };
+    }
+
+    case 'APPLY_DOCUMENT': {
+      const prev = pushUndo(state);
+      return {
+        ...prev,
+        document: action.document,
+        selectedNodeId: action.selectedNodeId === undefined ? state.selectedNodeId : action.selectedNodeId,
+        editingNodeId: null,
       };
     }
 
@@ -692,6 +768,98 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     default:
       return state;
   }
+}
+
+/** Apply an AI/user batch as one validated document mutation. */
+export function applyMindmapOperations(
+  document: MindmapDocument,
+  operations: MindmapOperation[],
+): { document: MindmapDocument; createdNodeIds: Record<string, string> } {
+  if (operations.length === 0) return { document, createdNodeIds: {} };
+  if (operations.length > 200) throw new Error('A batch may contain at most 200 operations');
+
+  let nodes = Object.fromEntries(
+    Object.entries(document.nodes).map(([id, node]) => [id, { ...node, childIds: [...node.childIds], tags: [...node.tags] }]),
+  ) as Record<string, MindmapNode>;
+  const aliases: Record<string, string> = {};
+  const resolve = (value: string): string => aliases[value] ?? value;
+  const requireNode = (value: string): MindmapNode => {
+    const id = resolve(value);
+    const node = nodes[id];
+    if (!node) throw new Error(`Node ${value} not found`);
+    return node;
+  };
+  const isDescendant = (ancestorId: string, candidateId: string): boolean => {
+    let current: string | null = candidateId;
+    while (current) {
+      if (current === ancestorId) return true;
+      current = nodes[current]?.parentId ?? null;
+    }
+    return false;
+  };
+  const deleteRecursive = (nodeId: string): void => {
+    const node = nodes[nodeId];
+    if (!node) return;
+    for (const childId of [...node.childIds]) deleteRecursive(childId);
+    if (node.parentId && nodes[node.parentId]) {
+      nodes[node.parentId] = { ...nodes[node.parentId], childIds: nodes[node.parentId].childIds.filter((id) => id !== nodeId) };
+    }
+    delete nodes[nodeId];
+  };
+
+  for (const operation of operations) {
+    if (operation.type === 'add') {
+      const parent = requireNode(operation.parentId);
+      const id = generateNodeId();
+      if (operation.alias) {
+        if (aliases[operation.alias] || nodes[operation.alias]) throw new Error(`Duplicate alias ${operation.alias}`);
+        aliases[operation.alias] = id;
+      }
+      const childIds = [...parent.childIds];
+      const index = operation.index === undefined ? childIds.length : Math.max(0, Math.min(childIds.length, operation.index));
+      childIds.splice(index, 0, id);
+      nodes[parent.id] = { ...parent, childIds };
+      nodes[id] = {
+        id,
+        text: operation.text.trim() || 'Untitled',
+        note: operation.note ?? '',
+        parentId: parent.id,
+        childIds: [],
+        position: { x: parent.position.x + 230, y: parent.position.y },
+        tags: operation.tags ?? [],
+        status: operation.status ?? 'none',
+        color: operation.color ?? 'default',
+        link: operation.link ?? '',
+        pinned: false,
+      };
+    } else if (operation.type === 'update') {
+      const node = requireNode(operation.nodeId);
+      const updates = Object.fromEntries(
+        Object.entries(operation).filter(([key, value]) => key !== 'type' && key !== 'nodeId' && value !== undefined),
+      );
+      nodes[node.id] = { ...node, ...updates };
+    } else if (operation.type === 'delete') {
+      const node = requireNode(operation.nodeId);
+      if (node.id === document.rootId) throw new Error('Cannot delete the root node');
+      deleteRecursive(node.id);
+    } else if (operation.type === 'move') {
+      const node = requireNode(operation.nodeId);
+      const requestedParent = requireNode(operation.newParentId);
+      if (node.id === document.rootId) throw new Error('Cannot move the root node');
+      if (isDescendant(node.id, requestedParent.id)) throw new Error(`Cannot move ${node.id} under its descendant ${requestedParent.id}`);
+      if (node.parentId && nodes[node.parentId]) {
+        nodes[node.parentId] = { ...nodes[node.parentId], childIds: nodes[node.parentId].childIds.filter((id) => id !== node.id) };
+      }
+      const parent = nodes[requestedParent.id];
+      const childIds = [...parent.childIds];
+      const index = operation.index === undefined ? childIds.length : Math.max(0, Math.min(childIds.length, operation.index));
+      childIds.splice(index, 0, node.id);
+      nodes[parent.id] = { ...parent, childIds };
+      nodes[node.id] = { ...node, parentId: parent.id, pinned: false };
+    }
+  }
+
+  return { document: { ...document, nodes }, createdNodeIds: aliases };
 }
 
 export function createInitialState(doc: MindmapDocument): EditorState {

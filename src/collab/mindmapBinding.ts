@@ -36,6 +36,7 @@ import {
   getYNodes,
   META_ROOT_ID,
   META_TITLE,
+  META_LAYOUT,
   NODE_CHILD_IDS,
   NODE_COLOR,
   NODE_NOTE,
@@ -45,6 +46,8 @@ import {
   NODE_STATUS,
   NODE_TAGS,
   NODE_TEXT,
+  NODE_LINK,
+  NODE_PINNED,
   readYDoc,
 } from './yShape';
 
@@ -158,6 +161,9 @@ export class MindmapBinding {
       if (next.rootId !== prev.rootId) {
         this.yMeta.set(META_ROOT_ID, next.rootId);
       }
+      if (next.metadata.layout !== prev.metadata.layout) {
+        this.yMeta.set(META_LAYOUT, next.metadata.layout);
+      }
 
       const prevIds = new Set(Object.keys(prev.nodes));
       const nextIds = new Set(Object.keys(next.nodes));
@@ -199,6 +205,8 @@ export class MindmapBinding {
     if (next.status !== prev.status) yNode.set(NODE_STATUS, next.status);
     if (next.position.x !== prev.position.x) yNode.set(NODE_POS_X, next.position.x);
     if (next.position.y !== prev.position.y) yNode.set(NODE_POS_Y, next.position.y);
+    if (next.link !== prev.link) yNode.set(NODE_LINK, next.link);
+    if (next.pinned !== prev.pinned) yNode.set(NODE_PINNED, next.pinned);
 
     if (!arraysEqual(prev.childIds, next.childIds)) {
       const yChildIds = yNode.get(NODE_CHILD_IDS) as Y.Array<string> | undefined;
@@ -268,7 +276,10 @@ export class MindmapBinding {
     // current baseline so the reducer doesn't think they changed.
     const merged: MindmapDocument = {
       ...snapshot,
-      metadata: this.lastAppliedDocument.metadata,
+      metadata: {
+        ...this.lastAppliedDocument.metadata,
+        layout: snapshot.metadata.layout,
+      },
     };
     this.lastAppliedDocument = merged;
     this.epoch++;

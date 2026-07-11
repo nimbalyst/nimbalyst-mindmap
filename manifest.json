@@ -18,9 +18,9 @@
     "tagline": "Freeform spatial mindmap editor with AI-assisted editing",
     "longDescription": "Create hierarchical mind maps on an infinite canvas. Add nodes, color-code branches, attach notes and tags, and use the AI to generate entire mind maps from a topic.",
     "highlights": [
-      "Infinite canvas with keyboard-driven node creation",
-      "Color-coded branches, notes, tags, and status per node",
-      "AI generates complete mind maps from a topic description"
+      "Continuous keyboard capture with spatial navigation and branch focus",
+      "Hybrid layouts preserve manual positions, notes, links, tags, and status",
+      "Context-aware AI expands and reorganizes branches atomically"
     ],
     "fileTypes": [".mindmap"],
     "screenshots": [
@@ -48,8 +48,10 @@
     ],
     "aiTools": [
       "mindmap.get_document",
+      "mindmap.get_context",
       "mindmap.add_node",
       "mindmap.update_node",
+      "mindmap.apply_operations",
       "mindmap.delete_node",
       "mindmap.move_node"
     ],

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { MindmapDocument, EditorAction } from './types';
 
 interface OutlinePanelProps {
@@ -38,6 +38,17 @@ function OutlineItem({
   const isCollapsed = collapsedNodeIds.has(nodeId);
   const hasChildren = node.childIds.length > 0;
   const isRoot = nodeId === document.rootId;
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(node.text);
+
+  const commitTitle = useCallback(() => {
+    const text = draft.trim();
+    if (text && text !== node.text) {
+      dispatch({ type: 'UPDATE_NODE', nodeId, updates: { text } });
+      onDirty();
+    }
+    setIsEditing(false);
+  }, [draft, node.text, dispatch, nodeId, onDirty]);
 
   const handleClick = useCallback(() => {
     dispatch({ type: 'SET_SELECTED', nodeId });
@@ -142,7 +153,37 @@ function OutlineItem({
         ) : (
           <span className="outline-toggle-spacer" />
         )}
-        <span className="outline-text">{node.text || 'Untitled'}</span>
+        {isEditing ? (
+          <input
+            className="outline-edit-input"
+            value={draft}
+            autoFocus
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commitTitle}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter') commitTitle();
+              if (event.key === 'Escape') {
+                setDraft(node.text);
+                setIsEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <span
+            className="outline-text"
+            title={node.note || node.text}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              setDraft(node.text);
+              setIsEditing(true);
+            }}
+          >
+            {node.text || 'Untitled'}
+            {node.note && <span className="outline-note-indicator"> ···</span>}
+          </span>
+        )}
         {isSelected && !isRoot && (
           <div className="outline-actions">
             <button

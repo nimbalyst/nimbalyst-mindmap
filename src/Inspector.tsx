@@ -116,6 +116,27 @@ export function Inspector({ node, dispatch, onDirty }: InspectorProps) {
         />
       </div>
 
+      <div className="inspector-section">
+        <label className="inspector-label">Related link or workspace path</label>
+        <input
+          className="inspector-input"
+          value={node.link}
+          onChange={(e) => updateNode({ link: e.target.value })}
+          placeholder="https://… or path/to/file.md"
+        />
+      </div>
+
+      <div className="inspector-section inspector-position-row">
+        <label className="inspector-checkbox">
+          <input
+            type="checkbox"
+            checked={node.pinned}
+            onChange={(event) => updateNode({ pinned: event.target.checked })}
+          />
+          Preserve manual position
+        </label>
+      </div>
+
       <div className="inspector-section inspector-meta">
         <span className="inspector-meta-text">ID: {node.id}</span>
         <span className="inspector-meta-text">

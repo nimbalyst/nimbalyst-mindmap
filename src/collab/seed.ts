@@ -31,6 +31,7 @@ import {
   getYNodes,
   META_ROOT_ID,
   META_TITLE,
+  META_LAYOUT,
 } from './yShape';
 
 /**
@@ -76,6 +77,7 @@ function writeDocument(yDoc: Y.Doc, doc: MindmapDocument): void {
 
   yMeta.set(META_TITLE, doc.title);
   yMeta.set(META_ROOT_ID, doc.rootId);
+  yMeta.set(META_LAYOUT, doc.metadata.layout);
 
   for (const id of Object.keys(doc.nodes)) {
     const node = doc.nodes[id];

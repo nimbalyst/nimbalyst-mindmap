@@ -8,7 +8,7 @@ export interface EditOverlayProps {
     initialKey: string | null;
     isRoot: boolean;
   } | null;
-  onCommit: (nodeId: string, text: string) => void;
+  onCommit: (nodeId: string, text: string, intent: 'done' | 'sibling' | 'child') => void;
   onCancel: () => void;
 }
 
@@ -51,12 +51,12 @@ export function EditOverlay({ editing, onCommit, onCancel }: EditOverlayProps) {
     sel?.addRange(range);
   }, [editing]);
 
-  const commit = useCallback(() => {
+  const commit = useCallback((intent: 'done' | 'sibling' | 'child' = 'done') => {
     const e = editingRef.current;
     if (!e || !ref.current) return;
     const trimmed = (ref.current.textContent || '').trim();
     if (trimmed) {
-      onCommit(e.nodeId, trimmed);
+      onCommit(e.nodeId, trimmed, intent);
     } else {
       onCancel();
     }
@@ -65,9 +65,12 @@ export function EditOverlay({ editing, onCommit, onCancel }: EditOverlayProps) {
   const handleKeyDown = useCallback(
     (ev: React.KeyboardEvent) => {
       ev.stopPropagation(); // never let keys escape to parent handlers
-      if (ev.key === 'Enter') {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
         ev.preventDefault();
-        commit();
+        commit('sibling');
+      } else if (ev.key === 'Tab') {
+        ev.preventDefault();
+        commit('child');
       } else if (ev.key === 'Escape') {
         ev.preventDefault();
         onCancel();
@@ -77,7 +80,7 @@ export function EditOverlay({ editing, onCommit, onCancel }: EditOverlayProps) {
   );
 
   const handleBlur = useCallback(() => {
-    commit();
+    commit('done');
   }, [commit]);
 
   if (!editing) return null;

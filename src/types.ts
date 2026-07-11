@@ -3,11 +3,13 @@
 // Imperative API exposed to AI tools via host.registerEditorAPI()
 export interface MindmapEditorAPI {
   getDocument(): MindmapDocument;
+  getContext(nodeId?: string, depth?: number): MindmapContext;
   addNode(parentId: string, text: string, options?: {
     color?: NodeColor;
     status?: NodeStatus;
     tags?: string[];
     note?: string;
+    link?: string;
     index?: number;
   }): string; // returns new node ID
   updateNode(nodeId: string, updates: {
@@ -16,10 +18,50 @@ export interface MindmapEditorAPI {
     status?: NodeStatus;
     tags?: string[];
     note?: string;
+    link?: string;
   }): void;
   deleteNode(nodeId: string): void;
   moveNode(nodeId: string, newParentId: string, index?: number): void;
+  applyOperations(operations: MindmapOperation[]): {
+    createdNodeIds: Record<string, string>;
+    operationCount: number;
+  };
 }
+
+export interface MindmapContext {
+  selectedNodeId: string | null;
+  rootId: string;
+  node: MindmapNode;
+  path: Array<{ id: string; text: string }>;
+  subtree: MindmapNode[];
+}
+
+export type MindmapOperation =
+  | {
+      type: 'add';
+      /** Existing node id or an alias declared by an earlier add operation. */
+      parentId: string;
+      alias?: string;
+      text: string;
+      note?: string;
+      tags?: string[];
+      status?: NodeStatus;
+      color?: NodeColor;
+      link?: string;
+      index?: number;
+    }
+  | {
+      type: 'update';
+      nodeId: string;
+      text?: string;
+      note?: string;
+      tags?: string[];
+      status?: NodeStatus;
+      color?: NodeColor;
+      link?: string;
+    }
+  | { type: 'delete'; nodeId: string }
+  | { type: 'move'; nodeId: string; newParentId: string; index?: number };
 
 export interface MindmapNode {
   id: string;
@@ -31,6 +73,10 @@ export interface MindmapNode {
   tags: string[];
   status: NodeStatus;
   color: NodeColor;
+  /** Optional related URL, workspace path, or artifact reference. */
+  link: string;
+  /** Manual positions are preserved by hybrid layout. */
+  pinned: boolean;
 }
 
 export type NodeStatus = 'none' | 'idea' | 'question' | 'todo' | 'in-progress' | 'done';
@@ -45,12 +91,15 @@ export type NodeColor =
   | 'purple'
   | 'pink';
 
+export type LayoutMode = 'balanced' | 'right';
+
 export interface MindmapDocument {
   version: number;
   title: string;
   rootId: string;
   nodes: Record<string, MindmapNode>;
   metadata: {
+    layout: LayoutMode;
     createdAt: string;
     updatedAt: string;
     canvas: {
@@ -90,6 +139,9 @@ export type EditorAction =
   | { type: 'MOVE_NODE'; nodeId: string; newParentId: string; index?: number }
   | { type: 'REORDER_CHILDREN'; parentId: string; childIds: string[] }
   | { type: 'REPLACE_DOCUMENT'; document: MindmapDocument; collabEpoch?: number }
-  | { type: 'UPDATE_POSITIONS'; positions: Record<string, { x: number; y: number }> }
+  | { type: 'UPDATE_POSITIONS'; positions: Record<string, { x: number; y: number }>; pin?: boolean }
+  | { type: 'SET_ALL_PINNED'; pinned: boolean }
+  | { type: 'EXPAND_PATH'; nodeId: string }
+  | { type: 'APPLY_DOCUMENT'; document: MindmapDocument; selectedNodeId?: string | null }
   | { type: 'UNDO' }
   | { type: 'REDO' };
