@@ -769,6 +769,7 @@ function MindmapCanvas({
         isLeftSide: leftSide,
         childCount: node.childIds.length,
         remoteEditors: remoteEditorsByNode.get(nodeId) ?? [],
+        workspacePath: host.workspaceId,
         onStartEditing: readOnly ? undefined : handleStartEditing,
         onToggleCollapse: handleToggleCollapse,
         onSelect: handleSelect,
@@ -809,6 +810,7 @@ function MindmapCanvas({
     handleStartEditing,
     handleToggleCollapse,
     handleSelect,
+    host.workspaceId,
   ]);
 
   // Handle node position changes from dragging
@@ -888,7 +890,8 @@ function MindmapCanvas({
       (n) =>
         n.text.toLowerCase().includes(q) ||
         n.note.toLowerCase().includes(q) ||
-        n.tags.some((t) => t.toLowerCase().includes(q))
+        n.tags.some((t) => t.toLowerCase().includes(q)) ||
+        n.link.toLowerCase().includes(q)
     );
   }, [searchQuery, state.document.nodes]);
 
@@ -1172,7 +1175,12 @@ function MindmapCanvas({
 
         {/* Inspector -- only shown when a node is selected (not in read-only mode) */}
         {selectedNode && !readOnly && (
-          <Inspector node={selectedNode} dispatch={dispatch} onDirty={markDirty} />
+          <Inspector
+            node={selectedNode}
+            dispatch={dispatch}
+            onDirty={markDirty}
+            workspacePath={host.workspaceId}
+          />
         )}
       </div>
       {showShortcuts && (

@@ -97,6 +97,7 @@ Supported keys:
 - `color`: default, red, orange, yellow, green, blue, purple, pink
 - `status`: none, idea, question, todo, in-progress, done
 - `tags`: comma-separated list
+- `link`: one related workspace document, URL, or tracker item; tracker items use a canonical `nimbalyst://…` link and resolve live title/status through the host
 
 The `{...}` syntax was chosen because:
 - It degrades gracefully in plain markdown viewers (appears as text)

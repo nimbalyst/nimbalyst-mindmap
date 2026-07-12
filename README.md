@@ -12,7 +12,7 @@ Nimbalyst Mindmap is a canvas-first mindmap editor for Nimbalyst. It stores maps
 - AI tools and Claude plugin support for creating and editing mindmaps
 - Continuous keyboard capture: Enter for siblings, Tab for children, and spatial arrow navigation
 - Hybrid layout that preserves manually positioned nodes, plus balanced and right-logical structures
-- Focus mode, searchable notes/tags, inline note previews, related links, and live collaborator editing badges
+- Focus mode, searchable notes/tags/links, inline note previews, unified document/URL/tracker links, and collaborator editing badges
 
 ## Keyboard workflow
 
@@ -33,7 +33,7 @@ The editor publishes the selected node as Nimbalyst chat context. AI tools can r
 
 ## File Format
 
-`.mindmap` files are standard markdown with one root heading, optional frontmatter, and nested structure built from headings and lists. Node metadata can carry colors, status, tags, related links, and pinned coordinates without making the outline opaque. See [`examples/`](./examples) and the Claude skill in [`claude-plugin/`](./claude-plugin) for format examples.
+`.mindmap` files are standard markdown with one root heading, optional frontmatter, and nested structure built from headings and lists. Node metadata can carry colors, status, tags, one related link, and pinned coordinates without making the outline opaque. A link can target a workspace document, URL, or tracker item (`{link: nimbalyst://NIM-123}`); tracker links resolve live metadata in Nimbalyst. See [`examples/`](./examples) and the Claude skill in [`claude-plugin/`](./claude-plugin) for format examples.
 
 ## Development
 

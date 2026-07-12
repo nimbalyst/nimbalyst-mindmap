@@ -43,7 +43,7 @@ Supported keys:
 - `color`: default, red, orange, yellow, green, blue, purple, pink
 - `status`: none, idea, question, todo, in-progress, done
 - `tags`: comma-separated list
-- `link`: related URL, workspace path, or artifact reference
+- `link`: one related workspace document, URL, or tracker item; tracker items use a canonical link such as `nimbalyst://NIM-123`
 - `pinned`: `true` when a manual canvas position should survive hybrid layout
 - `x`, `y`: pinned canvas coordinates (written automatically by the editor)
 
@@ -83,7 +83,7 @@ layout: balanced
 ### Prototypes
 - Interactive prototype {status: todo}
 
-## Engineering {color: green}
+## Engineering {color: green, link: nimbalyst://NIM-123}
 - API design
   > RESTful endpoints for the core product.
   - Authentication

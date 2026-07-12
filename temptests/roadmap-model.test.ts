@@ -19,6 +19,13 @@ describe('roadmap model capabilities', () => {
     expect(estimateNodeHeight(root)).toBe(70);
   });
 
+  it('reserves one bounded row for any link kind', () => {
+    const document = createEmptyDocument();
+    expect(estimateNodeHeight({ ...document.nodes[document.rootId], link: 'docs/architecture.md' })).toBe(77);
+    expect(estimateNodeHeight({ ...document.nodes[document.rootId], link: 'nimbalyst://NIM-20' })).toBe(77);
+    expect(estimateNodeWidth({ ...document.nodes[document.rootId], link: 'nimbalyst://NIM-20' }, false)).toBeGreaterThanOrEqual(240);
+  });
+
   it('round-trips links and pinned manual positions through readable markdown', () => {
     const document = parseDocument(`---
 title: Linked map
@@ -45,6 +52,32 @@ title: Linked map
     });
   });
 
+  it('keeps tracker items in the same link field as documents and URLs', () => {
+    const document = parseDocument(`---
+title: Tracker map
+---
+
+# Root
+## Authentication {link: nimbalyst://NIM-123}
+`);
+    const authentication = Object.values(document.nodes).find((node) => node.text === 'Authentication');
+
+    expect(authentication?.link).toBe('nimbalyst://NIM-123');
+    const serialized = serializeDocument(document);
+    expect(serialized).toContain('link: nimbalyst://NIM-123');
+    expect(serialized).not.toContain('trackers:');
+    expect(Object.values(parseDocument(serialized).nodes).find((node) => node.text === 'Authentication')?.link)
+      .toBe('nimbalyst://NIM-123');
+  });
+
+  it('folds the short-lived trackers metadata into the unified link on read', () => {
+    const document = parseDocument('# Root\n## Legacy {trackers: NIM-99, NIM-100}\n');
+    const legacy = Object.values(document.nodes).find((node) => node.text === 'Legacy');
+
+    expect(legacy).toMatchObject({ link: 'nimbalyst://NIM-99' });
+    expect(serializeDocument(document)).toContain('link: nimbalyst://NIM-99');
+  });
+
   it('supports aliases within an atomic AI batch', () => {
     const original = createEmptyDocument();
     const result = applyMindmapOperations(original, [
@@ -62,6 +95,21 @@ title: Linked map
       note: 'Talk with five customers.',
     });
     expect(original.nodes[original.rootId].childIds).toEqual([]);
+  });
+
+  it('uses the ordinary link field for tracker links in atomic AI operations', () => {
+    const original = createEmptyDocument();
+    const result = applyMindmapOperations(original, [
+      {
+        type: 'add',
+        parentId: original.rootId,
+        alias: 'linked',
+        text: 'Linked work',
+        link: 'nimbalyst://NIM-7',
+      },
+    ]);
+
+    expect(result.document.nodes[result.createdNodeIds.linked].link).toBe('nimbalyst://NIM-7');
   });
 
   it('rejects an invalid batch without mutating the source document', () => {

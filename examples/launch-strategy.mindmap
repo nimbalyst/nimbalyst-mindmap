@@ -1,39 +1,46 @@
 ---
 title: Launch Strategy
+layout: balanced
 ---
 
-# Launch Strategy
+# Launch Strategy {link: plans/nimbalyst-mindmap-extension-research.md}
 > Outline for a new product release across positioning, launch assets, rollout, and measurement.
 
 ## Positioning {color: blue}
-- Core message
-- Audience segments {tags: growth, product}
-  - Team leads
-  - Operators
-  - Technical evaluators
-- Differentiators {status: in-progress}
+
+### Core message
+### Audience segments {tags: growth, product}
+- Team leads
+- Operators
+- Technical evaluators
+### Differentiators {status: in-progress, link: README.md}
 
 ## Launch Assets {color: purple}
-- Landing page
-- Demo script
-- Announcement post
-- Customer quotes {status: todo}
+
+### Landing page {link: landing}
+### Demo script {link: nimbalyst://fm:plan:plans/nimbalyst-mindmap-extension-research.md}
+### Announcement post {link: nimbalyst://fm:plan:plans/mindmap-extension-design-plan.md}
+### Customer quotes {status: todo}
+### 
 
 ## Rollout Plan {color: green}
-- Internal enablement
-- Beta launch {status: done}
-- Public release {status: in-progress}
-  - Changelog
-  - Email campaign
-  - Social cutdowns
+
+### Internal enablement
+### Beta launch {status: done}
+### Public release {status: in-progress}
+- Changelog
+- Email campaign
+- Social cutdowns
 
 ## Measurement {color: orange}
-- Activation rate
-- Demo-to-trial conversion
-- Team invites
-- Feedback themes {tags: research}
+
+### Activation rate
+### Demo-to-trial conversion
+### Team invites
+### Feedback themes {tags: research}
 
 ## Risks {color: red}
-- Message drift
-- Asset delays
-- Support load {status: question}
+
+### Message drift
+### Asset delays
+### Support load {status: question}

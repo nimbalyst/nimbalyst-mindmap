@@ -1,6 +1,8 @@
 import React, { useCallback } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { TrackerReferenceChip } from '@nimbalyst/extension-sdk';
 import type { MindmapNode as MindmapNodeType, NodeColor } from './types';
+import { trackerReferenceFromLink } from './LinkPicker';
 
 export interface MindmapNodeData {
   node: MindmapNodeType;
@@ -10,6 +12,7 @@ export interface MindmapNodeData {
   isLeftSide: boolean;
   childCount: number;
   remoteEditors: string[];
+  workspacePath?: string;
   onStartEditing?: (nodeId: string) => void;
   onToggleCollapse: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
@@ -45,6 +48,17 @@ const STATUS_ICONS: Record<string, string> = {
   done: '\u2713',
 };
 
+function linkLabel(link: string): string {
+  if (/^https?:\/\//i.test(link)) {
+    try {
+      return new URL(link).hostname;
+    } catch {
+      return link;
+    }
+  }
+  return link.replace(/\\/g, '/').split('/').pop() || link;
+}
+
 export function MindmapNodeComponent({ data, id }: NodeProps) {
   const d = data as unknown as MindmapNodeData;
 
@@ -59,6 +73,7 @@ export function MindmapNodeComponent({ data, id }: NodeProps) {
   const bgColor = COLOR_MAP[d.node.color] || COLOR_MAP.default;
   const borderColor = COLOR_BORDER_MAP[d.node.color] || COLOR_BORDER_MAP.default;
   const statusIcon = d.node.status !== 'none' ? STATUS_ICONS[d.node.status] : null;
+  const trackerReference = trackerReferenceFromLink(d.node.link);
 
   const sourcePos = d.isRoot ? Position.Right : d.isLeftSide ? Position.Left : Position.Right;
   const targetPos = d.isRoot ? Position.Left : d.isLeftSide ? Position.Right : Position.Left;
@@ -116,18 +131,45 @@ export function MindmapNodeComponent({ data, id }: NodeProps) {
         </div>
       )}
 
-      {(d.node.link || d.node.pinned || d.remoteEditors.length > 0) && (
-        <div className="mindmap-node-indicators">
-          {d.node.link && (
+      {d.node.link && (
+        <div
+          className="mindmap-node-link-row"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {trackerReference ? (
+            <div className="mindmap-node-link-pill tracker">
+              <TrackerReferenceChip referenceKey={trackerReference} variant="default" />
+            </div>
+          ) : (
             <a
-              className="mindmap-node-link"
-              href={d.node.link}
+              className="mindmap-node-link-pill document"
+              href={/^https?:\/\//i.test(d.node.link) ? d.node.link : '#'}
               title={d.node.link}
-              onClick={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                if (/^https?:\/\//i.test(d.node.link)) {
+                  window.electronAPI?.openExternal?.(d.node.link);
+                  return;
+                }
+                const workspacePath = d.workspacePath?.replace(/\/$/, '');
+                const filePath = d.node.link.startsWith('/') || !workspacePath
+                  ? d.node.link
+                  : `${workspacePath}/${d.node.link}`;
+                window.electronAPI?.invoke?.('workspace:open-file', { workspacePath, filePath });
+              }}
             >
-              ↗
+              <span className="mindmap-node-link-pill-icon" aria-hidden="true">
+                {/https?:\/\//i.test(d.node.link) ? '↗' : '▤'}
+              </span>
+              <span className="mindmap-node-link-pill-label">{linkLabel(d.node.link)}</span>
             </a>
           )}
+        </div>
+      )}
+
+      {(d.node.pinned || d.remoteEditors.length > 0) && (
+        <div className="mindmap-node-indicators">
           {d.node.pinned && <span title="Manual position preserved">●</span>}
           {d.remoteEditors.map((userId) => (
             <span key={userId} className="mindmap-remote-editor" title={`${userId} is editing`}>

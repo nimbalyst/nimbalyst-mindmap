@@ -1,10 +1,12 @@
 import React, { useCallback } from 'react';
 import type { MindmapNode, NodeColor, NodeStatus, EditorAction } from './types';
+import { LinkPicker } from './LinkPicker';
 
 interface InspectorProps {
   node: MindmapNode | null;
   dispatch: React.Dispatch<EditorAction>;
   onDirty: () => void;
+  workspacePath?: string;
 }
 
 const COLORS: { value: NodeColor; label: string; swatch: string }[] = [
@@ -27,7 +29,7 @@ const STATUSES: { value: NodeStatus; label: string }[] = [
   { value: 'done', label: 'Done' },
 ];
 
-export function Inspector({ node, dispatch, onDirty }: InspectorProps) {
+export function Inspector({ node, dispatch, onDirty, workspacePath }: InspectorProps) {
   const updateNode = useCallback(
     (updates: Partial<MindmapNode>) => {
       if (!node) return;
@@ -117,12 +119,11 @@ export function Inspector({ node, dispatch, onDirty }: InspectorProps) {
       </div>
 
       <div className="inspector-section">
-        <label className="inspector-label">Related link or workspace path</label>
-        <input
-          className="inspector-input"
+        <label className="inspector-label">Link</label>
+        <LinkPicker
           value={node.link}
-          onChange={(e) => updateNode({ link: e.target.value })}
-          placeholder="https://… or path/to/file.md"
+          workspacePath={workspacePath}
+          onChange={(link) => updateNode({ link })}
         />
       </div>
 

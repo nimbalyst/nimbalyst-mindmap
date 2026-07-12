@@ -71,7 +71,7 @@ export function parseInlineMetadata(raw: string): ParsedMeta {
   // e.g. "color: blue, status: todo, tags: frontend, urgent"
   // -> ["color: blue", "status: todo", "tags: frontend, urgent"]
   const keyValuePairs: { key: string; val: string }[] = [];
-  const keyPattern = /\b(color|status|tags|link|pinned|x|y)\s*:/g;
+  const keyPattern = /\b(color|status|tags|link|trackers|pinned|x|y)\s*:/g;
   let match: RegExpExecArray | null;
   const starts: { key: string; start: number }[] = [];
   while ((match = keyPattern.exec(metaStr)) !== null) {
@@ -101,6 +101,13 @@ export function parseInlineMetadata(raw: string): ParsedMeta {
       case 'link':
         result.link = val;
         break;
+      case 'trackers': {
+        // Read the short-lived first-class tracker syntax without keeping a
+        // second node field. The first reference becomes the node's one link.
+        const [referenceKey] = val.split(',').map((part) => part.trim()).filter(Boolean);
+        if (!result.link && referenceKey) result.link = `nimbalyst://${referenceKey.replace(/^nimbalyst:\/\//i, '')}`;
+        break;
+      }
       case 'pinned':
         result.pinned = val === 'true';
         break;
@@ -344,6 +351,7 @@ interface LayoutResult {
 const DEFAULT_NODE_WIDTH = 160;
 const NODE_HEIGHT = 48;
 const TAG_ROW_HEIGHT = 20;
+const LINK_ROW_HEIGHT = 29;
 const H_SPACING = 70;
 const V_SPACING = 20;
 const MAX_NODE_WIDTH = 300;
@@ -367,13 +375,18 @@ export function estimateNodeWidth(node: MindmapNode, isRoot: boolean): number {
     const notePadding = isRoot ? 44 : NODE_H_PADDING;
     width = Math.max(width, notePadding + Math.min(notePreview.length, 42) * 6.2);
   }
+  if (/^nimbalyst:\/\//i.test(node.link)) {
+    width = Math.max(width, 240);
+  }
   return Math.max(80, Math.min(MAX_NODE_WIDTH, Math.round(width)));
 }
 
 /** Estimate the rendered height of a node (accounts for tag rows) */
 export function estimateNodeHeight(node: MindmapNode): number {
   const noteHeight = node.note ? 22 : 0;
-  return (node.tags.length > 0 ? NODE_HEIGHT + TAG_ROW_HEIGHT : NODE_HEIGHT) + noteHeight;
+  const tagHeight = node.tags.length > 0 ? TAG_ROW_HEIGHT : 0;
+  const linkHeight = node.link ? LINK_ROW_HEIGHT : 0;
+  return NODE_HEIGHT + noteHeight + tagHeight + linkHeight;
 }
 
 interface SubtreeSize {
@@ -779,7 +792,11 @@ export function applyMindmapOperations(
   if (operations.length > 200) throw new Error('A batch may contain at most 200 operations');
 
   let nodes = Object.fromEntries(
-    Object.entries(document.nodes).map(([id, node]) => [id, { ...node, childIds: [...node.childIds], tags: [...node.tags] }]),
+    Object.entries(document.nodes).map(([id, node]) => [id, {
+      ...node,
+      childIds: [...node.childIds],
+      tags: [...node.tags],
+    }]),
   ) as Record<string, MindmapNode>;
   const aliases: Record<string, string> = {};
   const resolve = (value: string): string => aliases[value] ?? value;
