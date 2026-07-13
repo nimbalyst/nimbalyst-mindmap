@@ -5,7 +5,31 @@ description: How to create, read, and edit .mindmap files. Use this skill when t
 
 # Mindmap File Format
 
-`.mindmap` files are standard markdown that Nimbalyst renders as an interactive mindmap. You can create and edit them directly -- no special tools needed.
+`.mindmap` files are standard markdown that Nimbalyst renders as an interactive mindmap. There are two ways to work with them:
+
+- **Writing a file directly** (Write/Edit) -- best for creating a new mindmap from scratch, or bulk-rewriting one that is not currently open. Use the markdown syntax documented below.
+- **The `mindmap.*` AI tools** -- best for editing a mindmap that is **open in the editor**. They make surgical, node-level, undoable changes and preserve editor-managed state (pinned `x`/`y` canvas positions, node IDs) that a full-file rewrite would clobber. See "Editing an open mindmap" below.
+
+When a mindmap is already open and you are changing part of it, prefer the tools over rewriting the file.
+
+## Editing an open mindmap (the `mindmap.*` tools)
+
+These tools are `editor`-scoped -- they only work when the target `.mindmap` file is the open/active editor. All node references are by node **ID**, so read the current structure first.
+
+| Tool | Use it to |
+|------|-----------|
+| `mindmap.get_document` | Read the whole map (title + all nodes with IDs, hierarchy, colors, statuses, tags, notes). Start here to learn node IDs before editing. |
+| `mindmap.get_context` | Read one branch: a node, its ancestor path, and a bounded subtree (`depth`, default 3). Prefer over `get_document` when working on a single branch of a large map. |
+| `mindmap.add_node` | Add one child node under `parentId` (with optional color/status/tags/note/link/index). Returns the new node ID. |
+| `mindmap.update_node` | Change fields on one node. Only provided fields change; `tags` and `note` **replace** existing values. |
+| `mindmap.move_node` | Reparent a node under `newParentId` (optional sibling `index`). Cannot move the root. |
+| `mindmap.delete_node` | Delete a node and all its descendants. Cannot delete the root. |
+| `mindmap.apply_operations` | Apply up to 200 add/update/delete/move ops **atomically as one undoable change**. Use for branch expansion or reorganizing the map so partial results are never left behind. |
+
+Guidance:
+- **Read before you write.** Call `get_document` (or `get_context` for one branch) to get node IDs; every mutating tool needs them.
+- **Batch multi-node changes** with `mindmap.apply_operations` rather than many single calls -- it is atomic and produces a single undo step. In an `add` op you can set an `alias`, then reference that alias as a `parentId`/`nodeId` in later ops within the same batch to build a subtree in one shot.
+- Field values match the markdown metadata: `color` = default/red/orange/yellow/green/blue/purple/pink; `status` = none/idea/question/todo/in-progress/done.
 
 ## Syntax
 
