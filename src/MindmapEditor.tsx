@@ -18,6 +18,7 @@ import {
   type EditorHostProps,
 } from '@nimbalyst/extension-sdk';
 import type { MindmapNode, MindmapEditorAPI, EditorAction, MindmapOperation } from './types';
+import { buildMindmapSelectionContextItem } from './selectionContext';
 import {
   parseDocument,
   serializeDocument,
@@ -153,34 +154,33 @@ function MindmapCanvas({
     });
   }, [state.selectedNodeId, state.editingNodeId]);
 
-  // Make the current branch first-class chat context. This surfaces a context
-  // chip in Nimbalyst and lets ordinary prompts such as "expand this branch"
-  // resolve without the user copying node ids.
+  // Make the current branch first-class, individually removable chat context.
+  // Rebuilding from document.nodes keeps the description fresh while the
+  // selected node is edited without requiring a second selection gesture.
   useEffect(() => {
     const nodeId = state.selectedNodeId;
     const node = nodeId ? state.document.nodes[nodeId] : undefined;
+    const contextHost = host as typeof host & {
+      setEditorContextItems?: (items: ReturnType<typeof buildMindmapSelectionContextItem>[] | null) => void;
+    };
     if (!node) {
-      host.setEditorContext(null);
+      if (contextHost.setEditorContextItems) contextHost.setEditorContextItems(null);
+      else host.setEditorContext(null);
       return;
     }
-    const path: string[] = [];
-    let current: MindmapNode | undefined = node;
-    while (current) {
-      path.unshift(current.text);
-      current = current.parentId ? state.document.nodes[current.parentId] : undefined;
+    const item = buildMindmapSelectionContextItem(node, state.document.nodes);
+    if (contextHost.setEditorContextItems) {
+      contextHost.setEditorContextItems([item]);
+    } else {
+      host.setEditorContext({ label: `Mindmap: ${item.label}`, description: item.description });
     }
-    host.setEditorContext({
-      label: `Mindmap: ${node.text || 'Untitled'}`,
-      description: [
-        `Selected mindmap node id: ${node.id}.`,
-        `Path: ${path.join(' > ')}.`,
-        `It has ${node.childIds.length} direct children.`,
-        node.note ? `Note: ${node.note}` : '',
-        'Use mindmap.get_context for the branch and mindmap.apply_operations for atomic edits.',
-      ].filter(Boolean).join(' '),
-    });
-    return () => host.setEditorContext(null);
   }, [host, state.selectedNodeId, state.document.nodes]);
+
+  useEffect(() => () => {
+    const contextHost = host as typeof host & { setEditorContextItems?: (items: null) => void };
+    contextHost.setEditorContextItems?.(null);
+    if (!contextHost.setEditorContextItems) host.setEditorContext(null);
+  }, [host]);
 
   // Future: pipe `bindingRef.current?.getRemoteEditingByUser()` into the
   // node renderer to draw "X is editing this node" badges. The awareness

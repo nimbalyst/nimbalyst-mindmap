@@ -2,7 +2,6 @@
 name: mindmap-format
 description: How to create, read, and edit .mindmap files. Use this skill when the user asks to create a mindmap, brainstorm visually, map out ideas, or when working with existing .mindmap files.
 ---
-
 # Mindmap File Format
 
 `.mindmap` files are standard markdown that Nimbalyst renders as an interactive mindmap. There are two ways to work with them:
@@ -17,7 +16,7 @@ When a mindmap is already open and you are changing part of it, prefer the tools
 These tools are `editor`-scoped -- they only work when the target `.mindmap` file is the open/active editor. All node references are by node **ID**, so read the current structure first.
 
 | Tool | Use it to |
-|------|-----------|
+| --- | --- |
 | `mindmap.get_document` | Read the whole map (title + all nodes with IDs, hierarchy, colors, statuses, tags, notes). Start here to learn node IDs before editing. |
 | `mindmap.get_context` | Read one branch: a node, its ancestor path, and a bounded subtree (`depth`, default 3). Prefer over `get_document` when working on a single branch of a large map. |
 | `mindmap.add_node` | Add one child node under `parentId` (with optional color/status/tags/note/link/index). Returns the new node ID. |
@@ -36,12 +35,12 @@ Guidance:
 ### Tree structure
 
 | Syntax | Mindmap level |
-|--------|--------------|
+| --- | --- |
 | `# Heading` | Root node (exactly one per file) |
 | `## Heading` | Depth 1 branches |
 | `### Heading` | Depth 2 branches |
 | `- List item` | Deeper nodes (indentation = depth) |
-| `  - Nested item` | 2 spaces per indent level |
+| `- Nested item` | 2 spaces per indent level |
 
 Headings define the top 3 levels. Below that, indented list items handle arbitrary nesting.
 
