@@ -94,6 +94,35 @@ function MindmapCanvas({
   const bindingRef = useRef<MindmapBinding | null>(null);
   // Bump on every remote state change so a re-render picks up the badges.
   const [awarenessRevision, forceRender] = useReducer((x) => x + 1, 0);
+  const bindMindmap = useCallback(({
+    yDoc,
+    awareness,
+  }: {
+    yDoc: ConstructorParameters<typeof MindmapBinding>[0];
+    awareness: NonNullable<ConstructorParameters<typeof MindmapBinding>[3]>;
+  }) => {
+    if (bindingRef.current) return { destroy: () => {} };
+    const binding = new MindmapBinding(
+      yDoc,
+      stateRef.current.document,
+      {
+        onRemoteDocument: (doc, epoch) => {
+          dispatch({ type: 'REPLACE_DOCUMENT', document: doc, collabEpoch: epoch });
+          if (!reactFlowReadyRef.current) pendingFitViewRef.current = true;
+          setNeedsLayout(true);
+        },
+        onRemoteAwareness: () => forceRender(),
+      },
+      awareness,
+    );
+    bindingRef.current = binding;
+    return {
+      destroy: () => {
+        binding.destroy();
+        if (bindingRef.current === binding) bindingRef.current = null;
+      },
+    };
+  }, []);
   const { isCollaborative } = useCollaborativeEditor(host, {
     // Delegate emptiness + seeding to the single pure codec so the live seed
     // and the host's headless seed are provably the same code.
@@ -103,29 +132,27 @@ function MindmapCanvas({
         yDoc,
         typeof content === 'string' ? content : new Uint8Array(content),
       ),
-    createBinding: ({ yDoc, awareness }) => {
-      const binding = new MindmapBinding(
-        yDoc,
-        stateRef.current.document,
-        {
-          onRemoteDocument: (doc, epoch) => {
-            dispatch({ type: 'REPLACE_DOCUMENT', document: doc, collabEpoch: epoch });
-            if (!reactFlowReadyRef.current) pendingFitViewRef.current = true;
-            setNeedsLayout(true);
-          },
-          onRemoteAwareness: () => forceRender(),
-        },
-        awareness,
-      );
-      bindingRef.current = binding;
-      return {
-        destroy: () => {
-          binding.destroy();
-          bindingRef.current = null;
-        },
-      };
-    },
+    createBinding: bindMindmap,
   });
+
+  // Offline startup can hydrate the local replica without changing the
+  // transport status. Observe the Y.Doc as well as the SDK status hook so an
+  // already-saved map becomes editable before the network returns.
+  useEffect(() => {
+    const collab = host.collaboration;
+    if (!collab) return;
+    let fallbackHandle: { destroy: () => void } | null = null;
+    const bindHydratedReplica = () => {
+      if (bindingRef.current || mindmapCodec.isEmpty(collab.yDoc)) return;
+      fallbackHandle = bindMindmap({ yDoc: collab.yDoc, awareness: collab.awareness });
+    };
+    bindHydratedReplica();
+    collab.yDoc.on('update', bindHydratedReplica);
+    return () => {
+      collab.yDoc.off('update', bindHydratedReplica);
+      fallbackHandle?.destroy();
+    };
+  }, [host, bindMindmap]);
 
   // Forward local document states to the Y.Doc when collab is active. The
   // epoch check is the anti-clobber invariant (NIM-1521): a state is only

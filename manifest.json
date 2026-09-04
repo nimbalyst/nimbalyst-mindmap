@@ -1,7 +1,7 @@
 {
   "id": "com.nimbalyst.mindmap",
   "name": "Nimbalyst Mindmap",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Nimbalyst",
   "description": "A freeform spatial mindmap editor with AI-assisted editing",
   "main": "dist/index.js",

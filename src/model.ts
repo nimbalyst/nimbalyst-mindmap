@@ -707,8 +707,14 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         document: action.document,
-        selectedNodeId: action.document.rootId,
-        editingNodeId: null,
+        selectedNodeId:
+          state.selectedNodeId && action.document.nodes[state.selectedNodeId]
+            ? state.selectedNodeId
+            : action.document.rootId,
+        editingNodeId:
+          state.editingNodeId && action.document.nodes[state.editingNodeId]
+            ? state.editingNodeId
+            : null,
         undoStack: [],
         redoStack: [],
         collabEpoch: action.collabEpoch ?? state.collabEpoch,

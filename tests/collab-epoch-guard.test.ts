@@ -92,6 +92,32 @@ describe('collab epoch guard (NIM-1521)', () => {
     expect(initial.collabEpoch).toBe(0);
   });
 
+  it('REPLACE_DOCUMENT preserves an in-progress edit when the merged node still exists', () => {
+    const initial = createInitialState(createEmptyDocument());
+    const child = makeNode('local-child', 'Untitled', initial.document.rootId);
+    const withChild = editorReducer(initial, {
+      type: 'CREATE_NODE',
+      parentId: initial.document.rootId,
+      node: child,
+    });
+    expect(withChild.selectedNodeId).toBe(child.id);
+    expect(withChild.editingNodeId).toBe(child.id);
+
+    const remoteSnapshot = {
+      ...withChild.document,
+      title: 'Renamed remotely',
+    };
+    const replaced = editorReducer(withChild, {
+      type: 'REPLACE_DOCUMENT',
+      document: remoteSnapshot,
+      collabEpoch: 4,
+    });
+
+    expect(replaced.selectedNodeId).toBe(child.id);
+    expect(replaced.editingNodeId).toBe(child.id);
+    expect(replaced.collabEpoch).toBe(4);
+  });
+
   it('the guarded forward never lets a stale default state delete remote nodes', () => {
     const yDoc = seededYDoc();
     const binding = new MindmapBinding(yDoc, createEmptyDocument(), {
