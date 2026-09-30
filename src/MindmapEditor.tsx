@@ -11,6 +11,7 @@ import {
   type OnNodesChange,
   type OnNodeDrag,
   BackgroundVariant,
+  PanOnScrollMode,
 } from '@xyflow/react';
 import {
   useEditorLifecycle,
@@ -1139,6 +1140,11 @@ function MindmapCanvas({
             proOptions={{ hideAttribution: true }}
             selectionOnDrag={false}
             panOnDrag
+            // Two-finger swipe pans; trackpad pinch (and Ctrl+wheel) zooms.
+            panOnScroll
+            panOnScrollMode={PanOnScrollMode.Free}
+            zoomOnScroll={false}
+            zoomOnPinch
             selectNodesOnDrag={false}
             nodesDraggable={!readOnly}
             nodesConnectable={false}
