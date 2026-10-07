@@ -5,6 +5,13 @@
   "license": "MIT",
   "author": "Nimbalyst, Inc.",
   "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "onFail": "error"
+    }
+  },
   "engines": {
     "node": ">=20"
   },

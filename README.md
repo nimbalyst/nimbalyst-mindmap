@@ -46,9 +46,10 @@ Requirements:
 Local commands:
 
 ```bash
-npm install
-npm test
-npm run build
+corepack enable   # once; package.json pins the pnpm version
+pnpm install
+pnpm test
+pnpm run build
 ```
 
 This repository contains the standalone extension source. If you are working from the main Nimbalyst project, use that project's extension build and marketplace publishing workflow.

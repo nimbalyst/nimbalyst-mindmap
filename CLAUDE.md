@@ -8,7 +8,7 @@ This is a **Nimbalyst extension** project. Nimbalyst is an extensible, AI-native
 
 ## Build and Development Workflow
 
-Extensions are built with Vite and installed into the running Nimbalyst app using MCP tools. **Do not run ****`npm run build`**** manually** -- always use the MCP tools so the extension is installed in one step.
+Extensions are built with Vite and installed into the running Nimbalyst app using MCP tools. **Do not run ****`pnpm run build`**** manually** -- always use the MCP tools so the extension is installed in one step.
 
 | Action | MCP Tool |
 | --- | --- |
@@ -24,7 +24,7 @@ Extensions are built with Vite and installed into the running Nimbalyst app usin
 3. Test in Nimbalyst immediately
 
 **First-time setup:**
-1. `npm install` in this directory
+1. `pnpm install` in this directory (run `corepack enable` once first; npm is blocked by `devEngines`)
 2. `extension_build` then `extension_install`
 
 ### Debugging

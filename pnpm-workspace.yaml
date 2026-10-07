@@ -1,0 +1,9 @@
+# Flat node_modules layout like npm, so undeclared (phantom) dependencies keep resolving.
+nodeLinker: hoisted
+
+# Only resolve package versions published at least 72h ago (supply-chain cooldown, same as the main repo).
+minimumReleaseAge: 4320
+
+# Dependencies allowed to run install scripts; esbuild's postinstall fetches the native binary Vite needs.
+allowBuilds:
+  esbuild: true
