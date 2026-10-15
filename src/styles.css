@@ -20,6 +20,9 @@
   --mindmap-blue-border: #406080;
   --mindmap-purple-border: #65408a;
   --mindmap-pink-border: #8a4065;
+
+  /* Minimap area outside the current viewport */
+  --mindmap-minimap-mask: rgba(0, 0, 0, 0.6);
 }
 
 /* Light theme overrides -- Nimbalyst sets data-theme on <html> or <body> */
@@ -41,6 +44,8 @@
   --mindmap-blue-border: #80a8cc;
   --mindmap-purple-border: #b088d0;
   --mindmap-pink-border: #d080b0;
+
+  --mindmap-minimap-mask: rgba(255, 255, 255, 0.6);
 }
 
 /* ==========================================

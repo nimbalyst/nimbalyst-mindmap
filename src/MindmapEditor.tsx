@@ -39,6 +39,7 @@ import { Inspector } from './Inspector';
 import { OutlinePanel } from './OutlinePanel';
 import { MindmapBinding } from './collab/mindmapBinding';
 import { mindmapCodec } from './collab/codec';
+import { createFrameRefitter } from './frameRefit';
 
 import '@xyflow/react/dist/style.css';
 
@@ -356,6 +357,28 @@ function MindmapCanvas({
   const createSiblingRef = useRef<(nodeId: string, before?: boolean) => void>(() => undefined);
   const navigateNodeRef = useRef<(key: string, node: MindmapNode, doc: typeof state.document) => void>(() => undefined);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+  // An embed's frame can change size after the first fit; refit so the map
+  // stays fitted to the frame instead of keeping the mount-time viewport.
+  // The wrapper only exists once loading finishes, hence isLoading.
+  useEffect(() => {
+    if (!host.embedded) return;
+    const wrapper = canvasWrapperRef.current;
+    if (!wrapper || typeof ResizeObserver === 'undefined') return;
+    const refit = createFrameRefitter(() => {
+      if (!reactFlowReadyRef.current) return;
+      const request = ++fitRequestRef.current;
+      requestAnimationFrame(() => {
+        if (request === fitRequestRef.current) fitView({ padding: 0.22, duration: 0 });
+      });
+    });
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1]?.contentRect;
+      if (rect) refit(rect);
+    });
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [host.embedded, isLoading, fitView]);
 
   const startEditing = useCallback(
     (nodeId: string, initialKey: string | null = null) => {
@@ -812,7 +835,7 @@ function MindmapCanvas({
         // Explicit dimensions for MiniMap (getBoundingClientRect returns 0 in extension host)
         measured: {
           width: estimateNodeWidth(node, nodeId === doc.rootId),
-          height: estimateNodeHeight(node),
+          height: estimateNodeHeight(node, nodeId === doc.rootId),
         },
         style: { width: estimateNodeWidth(node, nodeId === doc.rootId) },
       });
@@ -988,6 +1011,8 @@ function MindmapCanvas({
     return root.childIds.length === 0 && (root.text === 'Central idea' || root.text === '');
   }, [state.document]);
 
+  const isLightTheme = theme?.includes('light') ?? false;
+
   if (isLoading) {
     return (
       <div className="mindmap-loading">
@@ -997,7 +1022,7 @@ function MindmapCanvas({
   }
 
   return (
-    <div className={`mindmap-editor ${theme?.includes('light') ? 'light-theme' : ''}`} ref={editorContainerRef} tabIndex={-1}>
+    <div className={`mindmap-editor ${isLightTheme ? 'light-theme' : ''}`} ref={editorContainerRef} tabIndex={-1}>
       {/* Toolbar */}
       <div className="mindmap-toolbar">
         <div className="mindmap-toolbar-left">
@@ -1148,6 +1173,7 @@ function MindmapCanvas({
             selectNodesOnDrag={false}
             nodesDraggable={!readOnly}
             nodesConnectable={false}
+            colorMode={isLightTheme ? 'light' : 'dark'}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -1156,18 +1182,21 @@ function MindmapCanvas({
               color="var(--nim-text-faint)"
               style={{ opacity: 0.3 }}
             />
-            <MiniMap
-              position="bottom-left"
-              pannable
-              zoomable
-              nodeColor={() => '#6b8afd'}
-              maskColor="rgba(0, 0, 0, 0.6)"
-              style={{
-                background: 'var(--nim-bg-secondary)',
-                borderRadius: 6,
-                border: '1px solid var(--nim-border)',
-              }}
-            />
+            {/* An embed is a small frame inside another page; the minimap would cover the map. */}
+            {!host.embedded && (
+              <MiniMap
+                position="bottom-left"
+                pannable
+                zoomable
+                nodeColor={() => '#6b8afd'}
+                maskColor="var(--mindmap-minimap-mask)"
+                style={{
+                  background: 'var(--nim-bg-secondary)',
+                  borderRadius: 6,
+                  border: '1px solid var(--nim-border)',
+                }}
+              />
+            )}
           </ReactFlow>
 
           {/* Inline edit overlay -- lives outside React Flow to avoid re-render issues */}

@@ -356,24 +356,35 @@ const H_SPACING = 70;
 const V_SPACING = 20;
 const MAX_NODE_WIDTH = 300;
 const CHAR_WIDTH = 7.5; // approximate px per character at 13px font
-const NODE_H_PADDING = 28; // 14px padding each side
+const NODE_CHROME_WIDTH = 31; // 14px padding + 1.5px border, each side
+const ROOT_CHAR_WIDTH = 8.5; // approximate px per character at the root's 15px font
+const ROOT_CHROME_WIDTH = 48; // 22px padding + 2px border, each side
+const ROOT_EXTRA_HEIGHT = 12; // 4px more padding each side, a taller line, a thicker border
 const STATUS_ICON_WIDTH = 22; // icon + gap
-const COLLAPSE_BTN_WIDTH = 20;
+// The collapse button follows a 6px gap and shows "−" or "+<childCount>"
+// in 10px text with 2px padding each side. Sized for the wider collapsed
+// label so collapsing a branch never truncates its text.
+const COLLAPSE_GAP_WIDTH = 6;
+const COLLAPSE_PADDING_WIDTH = 4;
+const COLLAPSE_CHAR_WIDTH = 6;
+
+function collapseButtonWidth(childCount: number): number {
+  const labelChars = 1 + String(childCount).length;
+  return COLLAPSE_GAP_WIDTH + COLLAPSE_PADDING_WIDTH + labelChars * COLLAPSE_CHAR_WIDTH;
+}
 
 /** Estimate the rendered width of a node based on its text content */
 export function estimateNodeWidth(node: MindmapNode, isRoot: boolean): number {
   const text = node.text || 'Untitled';
-  let width = NODE_H_PADDING + text.length * CHAR_WIDTH;
+  // The estimate becomes the node's fixed style.width, and the label
+  // ellipsizes inside it, so every piece of chrome beside the text counts.
+  const chrome = isRoot ? ROOT_CHROME_WIDTH : NODE_CHROME_WIDTH;
+  let width = chrome + text.length * (isRoot ? ROOT_CHAR_WIDTH : CHAR_WIDTH);
   if (node.status !== 'none') width += STATUS_ICON_WIDTH;
-  if (node.childIds.length > 0) width += COLLAPSE_BTN_WIDTH;
-  if (isRoot) {
-    // Root has larger padding (22px each side) and larger font (~8.5px/char)
-    width = 44 + text.length * 8.5;
-  }
+  if (node.childIds.length > 0) width += collapseButtonWidth(node.childIds.length);
   if (node.note) {
     const notePreview = node.note.replace(/\s+/g, ' ').trim();
-    const notePadding = isRoot ? 44 : NODE_H_PADDING;
-    width = Math.max(width, notePadding + Math.min(notePreview.length, 42) * 6.2);
+    width = Math.max(width, chrome + Math.min(notePreview.length, 42) * 6.2);
   }
   if (/^nimbalyst:\/\//i.test(node.link)) {
     width = Math.max(width, 240);
@@ -382,11 +393,12 @@ export function estimateNodeWidth(node: MindmapNode, isRoot: boolean): number {
 }
 
 /** Estimate the rendered height of a node (accounts for tag rows) */
-export function estimateNodeHeight(node: MindmapNode): number {
+export function estimateNodeHeight(node: MindmapNode, isRoot = false): number {
   const noteHeight = node.note ? 22 : 0;
   const tagHeight = node.tags.length > 0 ? TAG_ROW_HEIGHT : 0;
   const linkHeight = node.link ? LINK_ROW_HEIGHT : 0;
-  return NODE_HEIGHT + noteHeight + tagHeight + linkHeight;
+  const rootHeight = isRoot ? ROOT_EXTRA_HEIGHT : 0;
+  return NODE_HEIGHT + rootHeight + noteHeight + tagHeight + linkHeight;
 }
 
 interface SubtreeSize {
@@ -404,7 +416,7 @@ function getSubtreeSize(
   if (!node) return { width: DEFAULT_NODE_WIDTH, height: NODE_HEIGHT };
 
   const nodeWidth = estimateNodeWidth(node, nodeId === rootId);
-  const nodeHeight = estimateNodeHeight(node);
+  const nodeHeight = estimateNodeHeight(node, nodeId === rootId);
 
   if (collapsed.has(nodeId) || node.childIds.length === 0) {
     return { width: nodeWidth, height: nodeHeight };
@@ -439,7 +451,7 @@ function layoutSubtree(
   if (!node) return;
 
   const subtreeSize = getSubtreeSize(nodeId, nodes, collapsed, rootId);
-  const nodeHeight = estimateNodeHeight(node);
+  const nodeHeight = estimateNodeHeight(node, nodeId === rootId);
   // Center the node vertically within its subtree
   const nodeY = y + (subtreeSize.height - nodeHeight) / 2;
   positions[nodeId] = { x, y: nodeY };
@@ -514,7 +526,7 @@ export function computeLayout(
   }
 
   // Root at center
-  const rootHeight = estimateNodeHeight(root);
+  const rootHeight = estimateNodeHeight(root, true);
   positions[doc.rootId] = { x: 0, y: -rootHeight / 2 };
 
   return { positions };
